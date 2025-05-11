@@ -58,6 +58,10 @@ public class WhoamiExtension implements BurpExtension {
             }
         });
 
+<<<<<<< HEAD
         core.logger.logToOutput("whoami extension loaded with method filtering and SQL injectionnullhat testing.");
+=======
+        core.logger.logToOutput("whoami extension loaded with method filtering and SQL injection testingkasireddy.");
+>>>>>>> 9a3674a721e2ffc0c3f6cad3b859616ba985e873
     }
 }
