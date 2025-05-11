@@ -3,29 +3,33 @@ package whoami.core;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.http.message.requests.HttpRequest;
+import whoami.ui.UIManager;
 
 public class HttpRequestSender {
     private final MontoyaApi api;
     private final Logger logger;
-    private final long delayMillis;
+    private final UIManager uiManager; // Store UIManager to access Config dynamically
 
-    public HttpRequestSender(MontoyaApi api, Logger logger, long delayMillis) {
+    public HttpRequestSender(MontoyaApi api, Logger logger, UIManager uiManager) {
         this.api = api;
         this.logger = logger;
-        this.delayMillis = delayMillis;
+        this.uiManager = uiManager;
     }
 
     public HttpRequestResponse sendRequest(HttpRequest request, String sessionId, boolean followRedirects) {
         logger.log("REQUEST", "Sending request to: " + request.url().toString());
+        long delayMillis = uiManager.getConfig().getDelayMillis(); // Fetch delay dynamically
         if (delayMillis > 0) {
-            logger.log("DELAY", "Applying delay of " + delayMillis + " ms");
+            logger.log("DELAY", "Applying delay of " + delayMillis + " ms for request to: " + request.url());
             try {
                 Thread.sleep(delayMillis);
                 logger.log("DELAY", "Completed delay of " + delayMillis + " ms");
             } catch (InterruptedException e) {
-                logger.logError("DELAY", "Delay interrupted: " + e.getMessage());
+                logger.logError("DELAY", "Delay interrupted for request to: " + request.url() + ", error: " + e.getMessage());
                 Thread.currentThread().interrupt();
             }
+        } else {
+            logger.log("DELAY", "No delay applied (delayMillis = 0) for request to: " + request.url());
         }
         return api.http().sendRequest(request);
     }

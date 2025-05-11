@@ -16,7 +16,7 @@ public class CoreModules {
     public CoreModules(MontoyaApi api, UIManager uiManager) {
         this.logger = new Logger(api);
         this.uiManager = uiManager;
-        this.requestSender = new HttpRequestSender(api, logger, uiManager.getConfig().getDelayMillis());
+        this.requestSender = new HttpRequestSender(api, logger, uiManager); // Pass UIManager
         this.scopeFilter = new ScopeFilter(api, uiManager.getConfig(), logger);
         this.parameterHandler = new ParameterHandler(logger);
         this.responseAnalyzer = new ResponseAnalyzer(api, logger);
