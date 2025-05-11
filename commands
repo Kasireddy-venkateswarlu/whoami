@@ -1,0 +1,1 @@
+javac -cp "libs/montoya-api-2025.4.jar:libs/json-20231013.jar" -d out/ core/*.java ui/*.java checkers/*.java WhoamiExtension.java
