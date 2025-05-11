@@ -8,6 +8,7 @@ import burp.api.montoya.proxy.http.ProxyRequestReceivedAction;
 import burp.api.montoya.proxy.http.ProxyRequestToBeSentAction;
 import whoami.checkers.SQLiChecker;
 import whoami.core.CoreModules;
+import whoami.core.ExtensionUtils;
 import whoami.ui.UIManager;
 
 import java.util.Set;
@@ -30,6 +31,10 @@ public class WhoamiExtension implements BurpExtension {
         uiManager.createTab();
         core = new CoreModules(api, uiManager);
         sqliChecker = new SQLiChecker(core);
+
+        // Register context menu provider
+        api.userInterface().registerContextMenuItemsProvider(new ExtensionUtils(api, core.logger, sqliChecker));
+        core.logger.logToOutput("Registered context menu provider for SQLi testing");
 
         api.proxy().registerRequestHandler(new ProxyRequestHandler() {
             @Override
@@ -75,7 +80,7 @@ public class WhoamiExtension implements BurpExtension {
             }
         });
 
-        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection testing, and JSON handling.");
+        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection testing, JSON handling, and context menu.");
     }
 
     private boolean hasExcludedExtension(String url, Set<String> excludedExtensions) {

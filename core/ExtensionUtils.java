@@ -4,6 +4,7 @@ import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.ui.contextmenu.ContextMenuEvent;
 import burp.api.montoya.ui.contextmenu.ContextMenuItemsProvider;
+import whoami.checkers.SQLiChecker;
 
 import javax.swing.*;
 import java.awt.*;
@@ -13,28 +14,60 @@ import java.util.List;
 public class ExtensionUtils implements ContextMenuItemsProvider {
     private final MontoyaApi api;
     private final Logger logger;
-    private final VulnerabilityCheckerManager checkerManager;
+    private final SQLiChecker sqliChecker;
 
-    public ExtensionUtils(MontoyaApi api, Logger logger, VulnerabilityCheckerManager checkerManager) {
+    public ExtensionUtils(MontoyaApi api, Logger logger, SQLiChecker sqliChecker) {
         this.api = api;
         this.logger = logger;
-        this.checkerManager = checkerManager;
+        this.sqliChecker = sqliChecker;
+        logger.log("CONTEXT", "ContextMenuItemsProvider initialized");
     }
 
     @Override
     public List<Component> provideMenuItems(ContextMenuEvent event) {
+        logger.log("CONTEXT", "Providing context menu items for event: " + event.toString());
+        logger.log("CONTEXT", "Selected requests: " + event.selectedRequestResponses().size() +
+                ", Has message editor: " + event.messageEditorRequestResponse().isPresent());
         List<Component> menuItems = new ArrayList<>();
 
+        // Handle single selected request from HTTP history or Site map
         if (event.selectedRequestResponses().size() == 1) {
-            JMenuItem sqliTestItem = new JMenuItem("Run SQLi Test");
-            sqliTestItem.addActionListener(e -> {
-                HttpRequestResponse requestResponse = event.selectedRequestResponses().get(0);
-                logger.log("CONTEXT", "Running SQLi test from context menu");
-                checkerManager.runChecker("SQLi", requestResponse);
-            });
-            menuItems.add(sqliTestItem);
+            logger.log("CONTEXT", "Single request selected, adding 'Run SQLi Test' menu item");
+            HttpRequestResponse requestResponse = event.selectedRequestResponses().get(0);
+            addSqliTestMenuItem(menuItems, requestResponse);
+        }
+        // Handle multiple selected requests (pick the first one)
+        else if (event.selectedRequestResponses().size() > 1) {
+            logger.log("CONTEXT", "Multiple requests selected (" + event.selectedRequestResponses().size() + "), using first request");
+            HttpRequestResponse requestResponse = event.selectedRequestResponses().get(0);
+            addSqliTestMenuItem(menuItems, requestResponse);
+        }
+        // Handle Repeater or message editor context
+        else if (event.messageEditorRequestResponse().isPresent()) {
+            logger.log("CONTEXT", "Message editor request/response present, adding 'Run SQLi Test' menu item");
+            HttpRequestResponse requestResponse = event.messageEditorRequestResponse().get().requestResponse();
+            addSqliTestMenuItem(menuItems, requestResponse);
+        }
+        else {
+            logger.log("CONTEXT", "No valid request/response found in event, no menu items added");
+            logger.log("CONTEXT", "Event details: InvocationType=" + event.invocationType() +
+                    ", SelectedIssues=" + event.selectedIssues().size());
         }
 
         return menuItems;
+    }
+
+    private void addSqliTestMenuItem(List<Component> menuItems, HttpRequestResponse requestResponse) {
+        if (requestResponse == null || requestResponse.request() == null) {
+            logger.log("CONTEXT", "RequestResponse or Request is null, skipping 'Run SQLi Test' menu item");
+            return;
+        }
+        JMenuItem sqliTestItem = new JMenuItem("Run SQLi Test");
+        sqliTestItem.addActionListener(e -> {
+            logger.log("CONTEXT", "Running SQLi test from context menu for URL: " + requestResponse.request().url());
+            // Run SQLi test asynchronously
+            new Thread(() -> sqliChecker.runContextMenuSqliTest(requestResponse)).start();
+        });
+        menuItems.add(sqliTestItem);
     }
 }

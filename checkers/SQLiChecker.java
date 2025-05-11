@@ -24,9 +24,13 @@ public class SQLiChecker {
     }
 
     public void checkForSQLi(HttpRequest request) {
+        checkForSQLi(request, false); // Default: respect delay
+    }
+
+    private void checkForSQLi(HttpRequest request, boolean bypassDelay) {
         String url = request.url().toString();
         String method = request.method();
-        core.logger.log("SQLI", "Starting SQL injection testing for URL: " + url + ", Method: " + method);
+        core.logger.log("SQLI", "Starting SQL injection testing for URL: " + url + ", Method: " + method + ", Bypass Delay: " + bypassDelay);
 
         // Handle standard parameters
         boolean hasStandardParameters = false;
@@ -48,7 +52,7 @@ public class SQLiChecker {
             // Single quote test
             HttpParameter paramWithSingleQuote = HttpParameter.parameter(name, value + "'", type);
             HttpRequest singleQuoteRequest = request.withUpdatedParameters(paramWithSingleQuote);
-            HttpRequestResponse singleQuoteResponse = core.requestSender.sendRequest(singleQuoteRequest);
+            HttpRequestResponse singleQuoteResponse = core.requestSender.sendRequest(singleQuoteRequest, "", false, bypassDelay);
             int code1 = singleQuoteResponse.response() != null ? singleQuoteResponse.response().statusCode() : -1;
 
             if (code1 == 500) {
@@ -60,7 +64,7 @@ public class SQLiChecker {
                 // Double quote test
                 HttpParameter paramWithDoubleQuotes = HttpParameter.parameter(name, value + "''", type);
                 HttpRequest doubleQuoteRequest = request.withUpdatedParameters(paramWithDoubleQuotes);
-                HttpRequestResponse doubleQuoteResponse = core.requestSender.sendRequest(doubleQuoteRequest);
+                HttpRequestResponse doubleQuoteResponse = core.requestSender.sendRequest(doubleQuoteRequest, "", false, bypassDelay);
                 int code2 = doubleQuoteResponse.response() != null ? doubleQuoteResponse.response().statusCode() : -1;
 
                 if (code2 == 200) {
@@ -89,7 +93,7 @@ public class SQLiChecker {
                 } else {
                     try {
                         JSONObject jsonObject = new JSONObject(body);
-                        processJsonNode(jsonObject, "", url, request);
+                        processJsonNode(jsonObject, "", url, request, bypassDelay);
                     } catch (JSONException e) {
                         core.logger.logError("SQLI", "Failed to parse JSON body: " + e.getMessage());
                     }
@@ -102,38 +106,82 @@ public class SQLiChecker {
         core.logger.log("SQLI", "Completed SQL injection testing for URL: " + url);
     }
 
-    private void processJsonNode(Object node, String path, String url, HttpRequest originalRequest) {
+    public void runContextMenuSqliTest(HttpRequestResponse requestResponse) {
+        core.logger.log("CONTEXT", "=== Starting SQL Injection Test from context menu ===");
+        try {
+            if (requestResponse == null || requestResponse.request() == null) {
+                core.logger.logError("CONTEXT", "RequestResponse or Request is null");
+                return;
+            }
+
+            HttpRequest request = requestResponse.request();
+            String url = request.url();
+            String method = request.method();
+
+            core.logger.log("CONTEXT", "URL: " + url + ", Method: " + method);
+            core.logger.log("CONTEXT", "Parameters: " + request.parameters().size());
+            core.logger.log("CONTEXT", "Bypassing all filters: Enabled=" + core.uiManager.getConfig().isEnabled() +
+                    ", SQLi Toggle=" + core.uiManager.getConfig().getCheckers().getOrDefault("SQLi", false) +
+                    ", Cookie Testing=" + core.uiManager.getConfig().isTestCookies() +
+                    ", Excluded Extensions=" + core.uiManager.getConfig().getExcludedExtensions() +
+                    ", Method Allowed=" + core.uiManager.getConfig().isMethodAllowed(method) +
+                    ", Delay=" + core.uiManager.getConfig().getDelayMillis() + "ms");
+
+            // Temporarily override settings for context menu test
+            boolean originalCookieTesting = core.uiManager.getConfig().isTestCookies();
+            core.uiManager.getConfig().setTestCookies(true); // Always test cookies
+            boolean originalSqliToggle = core.uiManager.getConfig().getCheckers().getOrDefault("SQLi", false);
+            core.uiManager.getConfig().getCheckers().put("SQLi", true); // Force SQLi testing
+
+            // Run SQLi test with delay bypassed
+            checkForSQLi(request, true); // Bypass delay
+
+            // Restore original settings
+            core.uiManager.getConfig().setTestCookies(originalCookieTesting);
+            core.uiManager.getConfig().getCheckers().put("SQLi", originalSqliToggle);
+
+            core.logger.log("CONTEXT", "=== Completed SQL Injection Test ===");
+        } catch (Exception e) {
+            core.logger.logError("CONTEXT", "Error in context menu SQLi test: " + e.getMessage());
+        }
+    }
+
+    private void processJsonNode(Object node, String path, String url, HttpRequest originalRequest, boolean bypassDelay) {
         core.logger.log("JSON", "Processing node at path: " + (path.isEmpty() ? "<root>" : path));
         if (node instanceof JSONObject) {
             JSONObject jsonObject = (JSONObject) node;
             for (String key : jsonObject.keySet()) {
                 String newPath = path.isEmpty() ? key : path + "." + key;
-                processJsonNode(jsonObject.get(key), newPath, url, originalRequest);
+                processJsonNode(jsonObject.get(key), newPath, url, originalRequest, bypassDelay);
             }
         } else if (node instanceof JSONArray) {
             JSONArray jsonArray = (JSONArray) node;
             if (jsonArray.length() == 0) {
                 core.logger.log("JSON", "Found empty array at: " + path + ", testing index [0]");
-                testJsonPath(path + "[0]", url, originalRequest);
+                testJsonPath(path + "[0]", url, originalRequest, bypassDelay);
             } else {
                 for (int i = 0; i < jsonArray.length(); i++) {
                     String newPath = path + "[" + i + "]";
-                    processJsonNode(jsonArray.get(i), newPath, url, originalRequest);
+                    processJsonNode(jsonArray.get(i), newPath, url, originalRequest, bypassDelay);
                 }
             }
         } else {
             String stringValue = node == null ? "null" : node.toString();
-            testJsonPath(path, url, originalRequest, stringValue);
+            testJsonPath(path, url, originalRequest, bypassDelay, stringValue); // Fixed parameter order
         }
     }
 
     private void testJsonPath(String path, String url, HttpRequest originalRequest, String... stringValue) {
+        testJsonPath(path, url, originalRequest, false, stringValue); // Default: respect delay
+    }
+
+    private void testJsonPath(String path, String url, HttpRequest originalRequest, boolean bypassDelay, String... stringValue) {
         String value = stringValue.length > 0 ? stringValue[0] : "";
         JSONObject modifiedJson1 = new JSONObject(originalRequest.bodyToString());
         if (setJsonValue(modifiedJson1, path, value + "'")) {
             HttpRequest req1 = originalRequest.withBody(modifiedJson1.toString());
             core.logger.log("JSON", "Sending single quote request for: " + path);
-            HttpRequestResponse resp1 = core.requestSender.sendRequest(req1);
+            HttpRequestResponse resp1 = core.requestSender.sendRequest(req1, "", false, bypassDelay);
             int code1 = resp1.response() != null ? resp1.response().statusCode() : -1;
 
             if (code1 == 500) {
@@ -147,7 +195,7 @@ public class SQLiChecker {
                 if (setJsonValue(modifiedJson2, path, value + "''")) {
                     HttpRequest req2 = originalRequest.withBody(modifiedJson2.toString());
                     core.logger.log("JSON", "Sending double quote request for: " + path);
-                    HttpRequestResponse resp2 = core.requestSender.sendRequest(req2);
+                    HttpRequestResponse resp2 = core.requestSender.sendRequest(req2, "", false, bypassDelay);
                     int code2 = resp2.response() != null ? resp2.response().statusCode() : -1;
 
                     if (code2 == 200) {

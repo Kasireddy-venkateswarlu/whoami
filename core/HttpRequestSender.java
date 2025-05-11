@@ -8,7 +8,7 @@ import whoami.ui.UIManager;
 public class HttpRequestSender {
     private final MontoyaApi api;
     private final Logger logger;
-    private final UIManager uiManager; // Store UIManager to access Config dynamically
+    private final UIManager uiManager;
 
     public HttpRequestSender(MontoyaApi api, Logger logger, UIManager uiManager) {
         this.api = api;
@@ -17,8 +17,12 @@ public class HttpRequestSender {
     }
 
     public HttpRequestResponse sendRequest(HttpRequest request, String sessionId, boolean followRedirects) {
+        return sendRequest(request, sessionId, followRedirects, false); // Default: respect delay
+    }
+
+    public HttpRequestResponse sendRequest(HttpRequest request, String sessionId, boolean followRedirects, boolean bypassDelay) {
         logger.log("REQUEST", "Sending request to: " + request.url().toString());
-        long delayMillis = uiManager.getConfig().getDelayMillis(); // Fetch delay dynamically
+        long delayMillis = bypassDelay ? 0 : uiManager.getConfig().getDelayMillis(); // Bypass delay if requested
         if (delayMillis > 0) {
             logger.log("DELAY", "Applying delay of " + delayMillis + " ms for request to: " + request.url());
             try {
@@ -29,7 +33,7 @@ public class HttpRequestSender {
                 Thread.currentThread().interrupt();
             }
         } else {
-            logger.log("DELAY", "No delay applied (delayMillis = 0) for request to: " + request.url());
+            logger.log("DELAY", "No delay applied (delayMillis = 0 or bypassed) for request to: " + request.url());
         }
         return api.http().sendRequest(request);
     }
