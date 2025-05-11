@@ -1,23 +1,24 @@
+// core/Logger.java
 package whoami.core;
 
-import burp.api.montoya.MontoyaApi;
+import burp.api.montoya.logging.Logging;
 
 public class Logger {
-    private final MontoyaApi api;
+    private final Logging logging;
 
-    public Logger(MontoyaApi api) {
-        this.api = api;
+    public Logger(Logging logging) {
+        this.logging = logging;
+    }
+
+    public void log(String category, String message) {
+        logging.logToOutput("[" + category + "] " + message);
+    }
+
+    public void logError(String category, String message) {
+        logging.logToError("[" + category + "] " + message);
     }
 
     public void logToOutput(String message) {
-        api.logging().logToOutput(message);
-    }
-
-    public void log(String context, String message) {
-        api.logging().logToOutput("[" + context + "] " + message);
-    }
-
-    public void logError(String context, String message) {
-        api.logging().logToError("[" + context + "] ERROR: " + message);
+        logging.logToOutput(message);
     }
 }

@@ -1,3 +1,4 @@
+// WhoamiExtension.java
 package whoami;
 
 import burp.api.montoya.BurpExtension;
@@ -7,6 +8,7 @@ import burp.api.montoya.proxy.http.ProxyRequestHandler;
 import burp.api.montoya.proxy.http.ProxyRequestReceivedAction;
 import burp.api.montoya.proxy.http.ProxyRequestToBeSentAction;
 import whoami.checkers.SQLiChecker;
+import whoami.checkers.XSSChecker;
 import whoami.core.CoreModules;
 import whoami.core.ExtensionUtils;
 import whoami.ui.UIManager;
@@ -18,6 +20,7 @@ import java.util.concurrent.Executors;
 public class WhoamiExtension implements BurpExtension {
     private CoreModules core;
     private SQLiChecker sqliChecker;
+    private XSSChecker xssChecker;
     private ExecutorService executorService;
 
     @Override
@@ -31,10 +34,11 @@ public class WhoamiExtension implements BurpExtension {
         uiManager.createTab();
         core = new CoreModules(api, uiManager);
         sqliChecker = new SQLiChecker(core);
+        xssChecker = new XSSChecker(core);
 
         // Register context menu provider
-        api.userInterface().registerContextMenuItemsProvider(new ExtensionUtils(api, core.logger, sqliChecker));
-        core.logger.logToOutput("Registered context menu provider for SQLi testing");
+        api.userInterface().registerContextMenuItemsProvider(new ExtensionUtils(api, core.logger, sqliChecker, xssChecker));
+        core.logger.logToOutput("Registered context menu provider for SQLi and XSS testing");
 
         api.proxy().registerRequestHandler(new ProxyRequestHandler() {
             @Override
@@ -75,12 +79,17 @@ public class WhoamiExtension implements BurpExtension {
                     executorService.submit(() -> sqliChecker.checkForSQLi(interceptedRequest));
                 }
 
+                // Process XSS asynchronously
+                if (core.uiManager.getConfig().getCheckers().getOrDefault("XSS", false)) {
+                    executorService.submit(() -> xssChecker.checkForXSS(interceptedRequest));
+                }
+
                 // Send original request immediately
                 return ProxyRequestToBeSentAction.continueWith(interceptedRequest);
             }
         });
 
-        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection testing, JSON handling, and context menu.");
+        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection testing, XSS testing, JSON handling, and context menu.");
     }
 
     private boolean hasExcludedExtension(String url, Set<String> excludedExtensions) {

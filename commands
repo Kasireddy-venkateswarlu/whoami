@@ -1,7 +1,7 @@
 javac -cp "libs/montoya-api-2025.4.jar:libs/json-20231013.jar" -d out/ core/*.java ui/*.java checkers/*.java WhoamiExtension.java
 
 cd out
-jar cvf WhoamiExtension.jar .
+	jar cvf WhoamiExtension.jar .
 
 git add .
 git commit -m "Updated extension files"

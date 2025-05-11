@@ -1,3 +1,4 @@
+// checkers/SQLiChecker.java
 package whoami.checkers;
 
 import burp.api.montoya.core.Annotations;
@@ -59,7 +60,7 @@ public class SQLiChecker {
                 Annotations annotations500 = Annotations.annotations()
                         .withHighlightColor(HighlightColor.YELLOW)
                         .withNotes("500 Internal Server Error detected in parameter: " + name);
-                core.siteMap().add(singleQuoteResponse.withAnnotations(annotations500));
+                core.getApi().siteMap().add(singleQuoteResponse.withAnnotations(annotations500));
 
                 // Double quote test
                 HttpParameter paramWithDoubleQuotes = HttpParameter.parameter(name, value + "''", type);
@@ -73,7 +74,7 @@ public class SQLiChecker {
                             .withHighlightColor(HighlightColor.RED)
                             .withNotes("SQL Injection found in parameter: " + name + "\n" +
                                        "Single quote caused 500, double quotes returned 200.");
-                    core.siteMap().add(doubleQuoteResponse.withAnnotations(annotations));
+                    core.getApi().siteMap().add(doubleQuoteResponse.withAnnotations(annotations));
                 }
             }
         }
@@ -167,7 +168,7 @@ public class SQLiChecker {
             }
         } else {
             String stringValue = node == null ? "null" : node.toString();
-            testJsonPath(path, url, originalRequest, bypassDelay, stringValue); // Fixed parameter order
+            testJsonPath(path, url, originalRequest, bypassDelay, stringValue);
         }
     }
 
@@ -189,7 +190,7 @@ public class SQLiChecker {
                 Annotations annotations500 = Annotations.annotations()
                         .withHighlightColor(HighlightColor.YELLOW)
                         .withNotes("500 Internal Server Error in JSON parameter: " + path);
-                core.siteMap().add(resp1.withAnnotations(annotations500));
+                core.getApi().siteMap().add(resp1.withAnnotations(annotations500));
 
                 JSONObject modifiedJson2 = new JSONObject(originalRequest.bodyToString());
                 if (setJsonValue(modifiedJson2, path, value + "''")) {
@@ -203,7 +204,7 @@ public class SQLiChecker {
                         Annotations annotations = Annotations.annotations()
                                 .withHighlightColor(HighlightColor.RED)
                                 .withNotes("SQL Injection found in JSON parameter: " + path);
-                        core.siteMap().add(resp2.withAnnotations(annotations));
+                        core.getApi().siteMap().add(resp2.withAnnotations(annotations));
                     }
                 }
             }

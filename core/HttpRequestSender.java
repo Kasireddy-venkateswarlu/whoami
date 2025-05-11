@@ -1,3 +1,4 @@
+// core/HttpRequestSender.java
 package whoami.core;
 
 import burp.api.montoya.MontoyaApi;
@@ -16,29 +17,28 @@ public class HttpRequestSender {
         this.uiManager = uiManager;
     }
 
-    public HttpRequestResponse sendRequest(HttpRequest request, String sessionId, boolean followRedirects) {
-        return sendRequest(request, sessionId, followRedirects, false); // Default: respect delay
-    }
-
-    public HttpRequestResponse sendRequest(HttpRequest request, String sessionId, boolean followRedirects, boolean bypassDelay) {
-        logger.log("REQUEST", "Sending request to: " + request.url().toString());
-        long delayMillis = bypassDelay ? 0 : uiManager.getConfig().getDelayMillis(); // Bypass delay if requested
-        if (delayMillis > 0) {
-            logger.log("DELAY", "Applying delay of " + delayMillis + " ms for request to: " + request.url());
+    public HttpRequestResponse sendRequest(HttpRequest request, String prefix, boolean logRequest, boolean bypassDelay) {
+        if (!bypassDelay && uiManager.getConfig().getDelayMillis() > 0) {
             try {
-                Thread.sleep(delayMillis);
-                logger.log("DELAY", "Completed delay of " + delayMillis + " ms");
+                logger.log("DELAY", "Applying delay of " + uiManager.getConfig().getDelayMillis() + "ms");
+                Thread.sleep(uiManager.getConfig().getDelayMillis());
             } catch (InterruptedException e) {
-                logger.logError("DELAY", "Delay interrupted for request to: " + request.url() + ", error: " + e.getMessage());
-                Thread.currentThread().interrupt();
+                logger.logError("DELAY", "Interrupted during delay: " + e.getMessage());
             }
         } else {
-            logger.log("DELAY", "No delay applied (delayMillis = 0 or bypassed) for request to: " + request.url());
+            logger.log("DELAY", "No delay applied (delayMillis = " + uiManager.getConfig().getDelayMillis() + " or bypassed)");
         }
-        return api.http().sendRequest(request);
-    }
 
-    public HttpRequestResponse sendRequest(HttpRequest request) {
-        return sendRequest(request, "", false);
+        if (logRequest) {
+            logger.log("REQUEST", prefix + "Sending request: " + request.url());
+        }
+
+        HttpRequestResponse response = api.http().sendRequest(request);
+        if (logRequest) {
+            logger.log("REQUEST", prefix + "Response received for: " + request.url() + ", Status: " +
+                    (response.response() != null ? response.response().statusCode() : "No response"));
+        }
+
+        return response;
     }
 }

@@ -1,3 +1,4 @@
+// core/ExtensionUtils.java
 package whoami.core;
 
 import burp.api.montoya.MontoyaApi;
@@ -5,6 +6,7 @@ import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.ui.contextmenu.ContextMenuEvent;
 import burp.api.montoya.ui.contextmenu.ContextMenuItemsProvider;
 import whoami.checkers.SQLiChecker;
+import whoami.checkers.XSSChecker;
 
 import javax.swing.*;
 import java.awt.*;
@@ -15,11 +17,13 @@ public class ExtensionUtils implements ContextMenuItemsProvider {
     private final MontoyaApi api;
     private final Logger logger;
     private final SQLiChecker sqliChecker;
+    private final XSSChecker xssChecker;
 
-    public ExtensionUtils(MontoyaApi api, Logger logger, SQLiChecker sqliChecker) {
+    public ExtensionUtils(MontoyaApi api, Logger logger, SQLiChecker sqliChecker, XSSChecker xssChecker) {
         this.api = api;
         this.logger = logger;
         this.sqliChecker = sqliChecker;
+        this.xssChecker = xssChecker;
         logger.log("CONTEXT", "ContextMenuItemsProvider initialized");
     }
 
@@ -32,21 +36,21 @@ public class ExtensionUtils implements ContextMenuItemsProvider {
 
         // Handle single selected request from HTTP history or Site map
         if (event.selectedRequestResponses().size() == 1) {
-            logger.log("CONTEXT", "Single request selected, adding 'Run SQLi Test' menu item");
+            logger.log("CONTEXT", "Single request selected, adding test menu items");
             HttpRequestResponse requestResponse = event.selectedRequestResponses().get(0);
-            addSqliTestMenuItem(menuItems, requestResponse);
+            addTestMenuItems(menuItems, requestResponse);
         }
         // Handle multiple selected requests (pick the first one)
         else if (event.selectedRequestResponses().size() > 1) {
             logger.log("CONTEXT", "Multiple requests selected (" + event.selectedRequestResponses().size() + "), using first request");
             HttpRequestResponse requestResponse = event.selectedRequestResponses().get(0);
-            addSqliTestMenuItem(menuItems, requestResponse);
+            addTestMenuItems(menuItems, requestResponse);
         }
         // Handle Repeater or message editor context
         else if (event.messageEditorRequestResponse().isPresent()) {
-            logger.log("CONTEXT", "Message editor request/response present, adding 'Run SQLi Test' menu item");
+            logger.log("CONTEXT", "Message editor request/response present, adding test menu items");
             HttpRequestResponse requestResponse = event.messageEditorRequestResponse().get().requestResponse();
-            addSqliTestMenuItem(menuItems, requestResponse);
+            addTestMenuItems(menuItems, requestResponse);
         }
         else {
             logger.log("CONTEXT", "No valid request/response found in event, no menu items added");
@@ -57,17 +61,26 @@ public class ExtensionUtils implements ContextMenuItemsProvider {
         return menuItems;
     }
 
-    private void addSqliTestMenuItem(List<Component> menuItems, HttpRequestResponse requestResponse) {
+    private void addTestMenuItems(List<Component> menuItems, HttpRequestResponse requestResponse) {
         if (requestResponse == null || requestResponse.request() == null) {
-            logger.log("CONTEXT", "RequestResponse or Request is null, skipping 'Run SQLi Test' menu item");
+            logger.log("CONTEXT", "RequestResponse or Request is null, skipping test menu items");
             return;
         }
+
+        // SQLi Test Menu Item
         JMenuItem sqliTestItem = new JMenuItem("Run SQLi Test");
         sqliTestItem.addActionListener(e -> {
             logger.log("CONTEXT", "Running SQLi test from context menu for URL: " + requestResponse.request().url());
-            // Run SQLi test asynchronously
             new Thread(() -> sqliChecker.runContextMenuSqliTest(requestResponse)).start();
         });
         menuItems.add(sqliTestItem);
+
+        // XSS Test Menu Item
+        JMenuItem xssTestItem = new JMenuItem("Run XSS Test");
+        xssTestItem.addActionListener(e -> {
+            logger.log("CONTEXT", "Running XSS test from context menu for URL: " + requestResponse.request().url());
+            new Thread(() -> xssChecker.runContextMenuXssTest(requestResponse)).start();
+        });
+        menuItems.add(xssTestItem);
     }
 }

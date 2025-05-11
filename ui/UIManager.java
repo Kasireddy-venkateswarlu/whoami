@@ -1,12 +1,11 @@
+// ui/UIManager.java
 package whoami.ui;
 
 import burp.api.montoya.MontoyaApi;
+import burp.api.montoya.ui.swing.SwingUtils;
+
 import javax.swing.*;
-import javax.swing.border.Border;
-import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -15,51 +14,20 @@ import java.util.Set;
 public class UIManager {
     private final MontoyaApi api;
     private final Config config;
-    private final Map<String, JCheckBox> methodCheckboxes = new HashMap<>();
-    private JTextField delayField;
-    private JTextField extensionsField;
 
     public UIManager(MontoyaApi api) {
         this.api = api;
-        this.config = new Config(methodCheckboxes);
+        this.config = new Config();
     }
 
-    public JComponent createTab() {
+    public Config getConfig() {
+        return config;
+    }
+
+    public void createTab() {
+        SwingUtils swingUtils = api.userInterface().swingUtils();
         JPanel panel = new JPanel(new BorderLayout());
-        panel.add(createBanner(), BorderLayout.NORTH);
-        panel.add(createControlPanel(), BorderLayout.CENTER);
-        panel.add(createOptionsPanel(), BorderLayout.SOUTH);
-        api.userInterface().registerSuiteTab("Whoami", panel);
-        return panel;
-    }
 
-    private JPanel createBanner() {
-        JPanel bannerPanel = new JPanel();
-        bannerPanel.setLayout(new BoxLayout(bannerPanel, BoxLayout.Y_AXIS));
-        bannerPanel.setBackground(new Color(47, 62, 70));
-        bannerPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
-
-        JLabel titleLabel = new JLabel("Whoami");
-        titleLabel.setFont(new Font("VT323", Font.BOLD, 28));
-        titleLabel.setForeground(new Color(244, 211, 94));
-        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JLabel authorLabel = new JLabel("by Kasireddy");
-        authorLabel.setFont(new Font("Roboto", Font.PLAIN, 16));
-        authorLabel.setForeground(Color.WHITE);
-        authorLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        bannerPanel.add(titleLabel);
-        bannerPanel.add(Box.createVerticalStrut(5));
-        bannerPanel.add(authorLabel);
-
-        Border border = BorderFactory.createLineBorder(new Color(244, 211, 94), 1);
-        bannerPanel.setBorder(border);
-        return bannerPanel;
-    }
-
-    private JPanel createControlPanel() {
-        JPanel panel = new JPanel(new BorderLayout());
         JLabel statusLabel = new JLabel("Extension is OFF");
         JToggleButton toggle = new JToggleButton("OFF");
         toggle.addActionListener(e -> {
@@ -68,117 +36,81 @@ public class UIManager {
             statusLabel.setText(config.isEnabled() ? "Extension is ON" : "Extension is OFF");
         });
 
-        panel.add(toggle, BorderLayout.WEST);
-        panel.add(statusLabel, BorderLayout.CENTER);
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.add(toggle, BorderLayout.WEST);
+        topPanel.add(statusLabel, BorderLayout.CENTER);
 
-        JPanel configPanel = new JPanel(new GridLayout(2, 1));
-        delayField = new JTextField("0", 5);
-        extensionsField = new JTextField("", 15);
-        extensionsField.setToolTipText("Enter comma-separated file extensions (e.g., .js,.css,.png)");
-        configPanel.add(createInputPanel("Delay between requests (seconds): ", delayField, this::updateDelay));
-        configPanel.add(createInputPanel("Skip tests for file extensions (e.g., .js,.css,.png): ", extensionsField, this::updateExtensions));
-        panel.add(configPanel, BorderLayout.SOUTH);
-        return panel;
-    }
-
-    private JPanel createInputPanel(String labelText, JTextField field, Runnable updateAction) {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        field.addActionListener(e -> updateAction.run());
-        field.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                    updateAction.run();
-                }
+        JTextField delayField = new JTextField("0", 5);
+        delayField.getDocument().addDocumentListener((SimpleDocumentListener) e -> {
+            try {
+                config.setDelayMillis(Integer.parseInt(delayField.getText()) * 1000);
+            } catch (NumberFormatException ex) {
+                config.setDelayMillis(0);
             }
         });
-        panel.add(new JLabel(labelText));
-        panel.add(field);
-        return panel;
-    }
+        JPanel delayPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        delayPanel.add(new JLabel("Delay between requests (seconds):"));
+        delayPanel.add(delayField);
 
-    private JPanel createOptionsPanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.add(new JLabel("Allowed HTTP Methods:"), BorderLayout.NORTH);
-        panel.add(createMethodPanel(), BorderLayout.CENTER);
-        panel.add(createTestingOptionsPanel(), BorderLayout.SOUTH);
-        return panel;
-    }
+        topPanel.add(delayPanel, BorderLayout.SOUTH);
+        panel.add(topPanel, BorderLayout.NORTH);
 
-    private JPanel createMethodPanel() {
-        JPanel panel = new JPanel(new GridLayout(0, 2));
+        JPanel methodPanel = new JPanel(new GridLayout(0, 2));
         String[] methods = {"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"};
         for (String method : methods) {
             JCheckBox checkbox = new JCheckBox(method, true);
-            methodCheckboxes.put(method, checkbox);
-            panel.add(checkbox);
+            checkbox.addActionListener(e -> config.setMethodAllowed(method, checkbox.isSelected()));
+            methodPanel.add(checkbox);
         }
-        return panel;
-    }
 
-    private JPanel createTestingOptionsPanel() {
-        JPanel panel = new JPanel(new GridLayout(2, 1));
         JCheckBox sqlInjectionCheckbox = new JCheckBox("Enable SQL Injection Testing");
         sqlInjectionCheckbox.addActionListener(e -> config.getCheckers().put("SQLi", sqlInjectionCheckbox.isSelected()));
-        JCheckBox cookieTestingCheckbox = new JCheckBox("Test Cookie Parameters", true);
-        cookieTestingCheckbox.addActionListener(e -> config.setTestCookies(cookieTestingCheckbox.isSelected()));
-        panel.add(sqlInjectionCheckbox);
-        panel.add(cookieTestingCheckbox);
-        return panel;
-    }
 
-    private void updateDelay() {
-        String input = delayField.getText().trim();
-        try {
-            if (input.isEmpty()) {
-                config.setDelayMillis(0);
-                delayField.setText("0");
-                return;
-            }
-            double delaySeconds = Double.parseDouble(input);
-            if (delaySeconds < 0) {
-                delaySeconds = 0;
-                delayField.setText("0");
-            }
-            config.setDelayMillis((long) (delaySeconds * 1000));
-        } catch (NumberFormatException e) {
-            config.setDelayMillis(0);
-            delayField.setText("0");
-        }
-    }
+        JCheckBox xssCheckbox = new JCheckBox("Enable XSS Testing");
+        xssCheckbox.addActionListener(e -> config.getCheckers().put("XSS", xssCheckbox.isSelected()));
 
-    private void updateExtensions() {
-        String input = extensionsField.getText().trim();
-        config.getExcludedExtensions().clear();
-        if (!input.isEmpty()) {
-            String[] extensions = input.split(",");
+        JCheckBox testCookiesCheckbox = new JCheckBox("Test Cookie Parameters");
+        testCookiesCheckbox.addActionListener(e -> config.setTestCookies(testCookiesCheckbox.isSelected()));
+
+        JTextArea excludedExtensionsArea = new JTextArea(3, 20);
+        excludedExtensionsArea.setText(".css,.js,.png,.jpg,.jpeg,.gif,.svg,.ico,.woff,.woff2,.ttf,.eot");
+        excludedExtensionsArea.getDocument().addDocumentListener((SimpleDocumentListener) e -> {
+            String[] extensions = excludedExtensionsArea.getText().split(",");
+            Set<String> excluded = new HashSet<>();
             for (String ext : extensions) {
-                ext = ext.trim();
+                ext = ext.trim().toLowerCase();
                 if (!ext.isEmpty()) {
                     if (!ext.startsWith(".")) {
                         ext = "." + ext;
                     }
-                    config.getExcludedExtensions().add(ext.toLowerCase());
+                    excluded.add(ext);
                 }
             }
-        }
-    }
+            config.setExcludedExtensions(excluded);
+        });
 
-    public Config getConfig() {
-        return config;
+        JPanel centerPanel = new JPanel(new BorderLayout());
+        centerPanel.add(new JLabel("Allowed HTTP Methods:"), BorderLayout.NORTH);
+        centerPanel.add(methodPanel, BorderLayout.CENTER);
+        JPanel testPanel = new JPanel(new GridLayout(8, 1));
+        testPanel.add(sqlInjectionCheckbox);
+        testPanel.add(xssCheckbox);
+        testPanel.add(testCookiesCheckbox);
+        testPanel.add(new JLabel("Excluded File Extensions (comma-separated):"));
+        testPanel.add(new JScrollPane(excludedExtensionsArea));
+        centerPanel.add(testPanel, BorderLayout.SOUTH);
+
+        panel.add(centerPanel, BorderLayout.CENTER);
+        api.userInterface().registerSuiteTab("whoami", panel);
     }
 
     public static class Config {
         private boolean isEnabled = false;
-        private long delayMillis = 0;
-        private final Set<String> excludedExtensions = new HashSet<>();
+        private final Map<String, Boolean> allowedMethods = new HashMap<>();
         private final Map<String, Boolean> checkers = new HashMap<>();
-        private boolean testCookies = true;
-        private final Map<String, JCheckBox> methodCheckboxes;
-
-        public Config(Map<String, JCheckBox> methodCheckboxes) {
-            this.methodCheckboxes = methodCheckboxes;
-        }
+        private boolean testCookies = false;
+        private Set<String> excludedExtensions = new HashSet<>();
+        private long delayMillis = 0;
 
         public boolean isEnabled() {
             return isEnabled;
@@ -188,16 +120,12 @@ public class UIManager {
             isEnabled = enabled;
         }
 
-        public long getDelayMillis() {
-            return delayMillis;
+        public boolean isMethodAllowed(String method) {
+            return allowedMethods.getOrDefault(method.toUpperCase(), true);
         }
 
-        public void setDelayMillis(long delayMillis) {
-            this.delayMillis = delayMillis;
-        }
-
-        public Set<String> getExcludedExtensions() {
-            return excludedExtensions;
+        public void setMethodAllowed(String method, boolean allowed) {
+            allowedMethods.put(method.toUpperCase(), allowed);
         }
 
         public Map<String, Boolean> getCheckers() {
@@ -212,9 +140,40 @@ public class UIManager {
             this.testCookies = testCookies;
         }
 
-        public boolean isMethodAllowed(String method) {
-            JCheckBox checkbox = methodCheckboxes.get(method.toUpperCase());
-            return checkbox != null && checkbox.isSelected();
+        public Set<String> getExcludedExtensions() {
+            return excludedExtensions;
+        }
+
+        public void setExcludedExtensions(Set<String> excludedExtensions) {
+            this.excludedExtensions = excludedExtensions;
+        }
+
+        public long getDelayMillis() {
+            return delayMillis;
+        }
+
+        public void setDelayMillis(long delayMillis) {
+            this.delayMillis = delayMillis;
+        }
+    }
+
+    @FunctionalInterface
+    public interface SimpleDocumentListener extends javax.swing.event.DocumentListener {
+        void update(javax.swing.event.DocumentEvent e);
+
+        @Override
+        default void insertUpdate(javax.swing.event.DocumentEvent e) {
+            update(e);
+        }
+
+        @Override
+        default void removeUpdate(javax.swing.event.DocumentEvent e) {
+            update(e);
+        }
+
+        @Override
+        default void changedUpdate(javax.swing.event.DocumentEvent e) {
+            update(e);
         }
     }
 }
