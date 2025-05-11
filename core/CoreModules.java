@@ -17,7 +17,7 @@ public class CoreModules {
         this.logger = new Logger(api);
         this.uiManager = uiManager;
         this.requestSender = new HttpRequestSender(api, logger, uiManager.getConfig().getDelayMillis());
-        this.scopeFilter = new ScopeFilter(api, uiManager.getConfig(), logger); // Use UIManager.Config
+        this.scopeFilter = new ScopeFilter(api, uiManager.getConfig(), logger);
         this.parameterHandler = new ParameterHandler(logger);
         this.responseAnalyzer = new ResponseAnalyzer(api, logger);
         this.siteMap = api.siteMap();

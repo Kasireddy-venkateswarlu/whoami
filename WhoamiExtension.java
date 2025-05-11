@@ -10,28 +10,48 @@ import whoami.checkers.SQLiChecker;
 import whoami.core.CoreModules;
 import whoami.ui.UIManager;
 
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 public class WhoamiExtension implements BurpExtension {
     private CoreModules core;
     private SQLiChecker sqliChecker;
+    private ExecutorService executorService;
 
     @Override
     public void initialize(MontoyaApi api) {
         api.extension().setName("whoami");
 
+        // Initialize ExecutorService for async tasks
+        executorService = Executors.newFixedThreadPool(5);
+
         UIManager uiManager = new UIManager(api);
-        uiManager.createTab(); // Let UIManager handle tab registration
+        uiManager.createTab();
         core = new CoreModules(api, uiManager);
         sqliChecker = new SQLiChecker(core);
 
         api.proxy().registerRequestHandler(new ProxyRequestHandler() {
             @Override
+            public ProxyRequestReceivedAction handleRequestReceived(InterceptedRequest interceptedRequest) {
+                return ProxyRequestReceivedAction.continueWith(interceptedRequest);
+            }
+
+            @Override
             public ProxyRequestToBeSentAction handleRequestToBeSent(InterceptedRequest interceptedRequest) {
                 if (!core.uiManager.getConfig().isEnabled()) {
+                    core.logger.logToOutput("Extension is disabled, allowing request: " + interceptedRequest.url().toString());
                     return ProxyRequestToBeSentAction.continueWith(interceptedRequest);
                 }
 
                 String url = interceptedRequest.url().toString();
                 String method = interceptedRequest.method();
+
+                // Check excluded extensions
+                if (hasExcludedExtension(url, core.uiManager.getConfig().getExcludedExtensions())) {
+                    core.logger.logToOutput("Skipping tests for URL with excluded extension: " + url);
+                    return ProxyRequestToBeSentAction.continueWith(interceptedRequest);
+                }
 
                 if (!core.scopeFilter.isInScope(url)) {
                     core.logger.logToOutput("Dropped OUT-OF-SCOPE request: " + url);
@@ -45,23 +65,29 @@ public class WhoamiExtension implements BurpExtension {
 
                 core.logger.logToOutput("Allowed " + method + " request in scope: " + url);
 
+                // Process SQL injection asynchronously
                 if (core.uiManager.getConfig().getCheckers().getOrDefault("SQLi", false)) {
-                    sqliChecker.checkForSQLi(interceptedRequest);
+                    executorService.submit(() -> sqliChecker.checkForSQLi(interceptedRequest));
                 }
 
+                // Send original request immediately
                 return ProxyRequestToBeSentAction.continueWith(interceptedRequest);
-            }
-
-            @Override
-            public ProxyRequestReceivedAction handleRequestReceived(InterceptedRequest interceptedRequest) {
-                return ProxyRequestReceivedAction.continueWith(interceptedRequest);
             }
         });
 
-<<<<<<< HEAD
-        core.logger.logToOutput("whoami extension loaded with method filtering and SQL injectionnullhat testing.");
-=======
-        core.logger.logToOutput("whoami extension loaded with method filtering and SQL injection testingkasireddy.");
->>>>>>> 9a3674a721e2ffc0c3f6cad3b859616ba985e873
+        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection testing, and JSON handling.");
+    }
+
+    private boolean hasExcludedExtension(String url, Set<String> excludedExtensions) {
+        if (excludedExtensions.isEmpty()) {
+            return false;
+        }
+        String lowerUrl = url.toLowerCase();
+        for (String ext : excludedExtensions) {
+            if (lowerUrl.endsWith(ext)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -16,19 +16,20 @@ public class HttpRequestSender {
     }
 
     public HttpRequestResponse sendRequest(HttpRequest request, String sessionId, boolean followRedirects) {
-        // Simulate delay if configured
+        logger.log("REQUEST", "Sending request to: " + request.url().toString());
         if (delayMillis > 0) {
+            logger.log("DELAY", "Applying delay of " + delayMillis + " ms");
             try {
                 Thread.sleep(delayMillis);
+                logger.log("DELAY", "Completed delay of " + delayMillis + " ms");
             } catch (InterruptedException e) {
-                logger.logToOutput("Request interrupted: " + e.getMessage());
+                logger.logError("DELAY", "Delay interrupted: " + e.getMessage());
+                Thread.currentThread().interrupt();
             }
         }
-        // Ignore sessionId for simplicity; extend if needed
         return api.http().sendRequest(request);
     }
 
-    // Overload for simpler usage in SQLiChecker
     public HttpRequestResponse sendRequest(HttpRequest request) {
         return sendRequest(request, "", false);
     }
