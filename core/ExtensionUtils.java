@@ -1,4 +1,3 @@
-// core/ExtensionUtils.java
 package whoami.core;
 
 import burp.api.montoya.MontoyaApi;
@@ -7,6 +6,7 @@ import burp.api.montoya.ui.contextmenu.ContextMenuEvent;
 import burp.api.montoya.ui.contextmenu.ContextMenuItemsProvider;
 import whoami.checkers.SQLiChecker;
 import whoami.checkers.XSSChecker;
+import whoami.checkers.CMDInjectionChecker;
 
 import javax.swing.*;
 import java.awt.*;
@@ -18,12 +18,14 @@ public class ExtensionUtils implements ContextMenuItemsProvider {
     private final Logger logger;
     private final SQLiChecker sqliChecker;
     private final XSSChecker xssChecker;
+    private final CMDInjectionChecker cmdInjectionChecker;
 
-    public ExtensionUtils(MontoyaApi api, Logger logger, SQLiChecker sqliChecker, XSSChecker xssChecker) {
+    public ExtensionUtils(MontoyaApi api, Logger logger, SQLiChecker sqliChecker, XSSChecker xssChecker, CMDInjectionChecker cmdInjectionChecker) {
         this.api = api;
         this.logger = logger;
         this.sqliChecker = sqliChecker;
         this.xssChecker = xssChecker;
+        this.cmdInjectionChecker = cmdInjectionChecker;
         logger.log("CONTEXT", "ContextMenuItemsProvider initialized");
     }
 
@@ -82,5 +84,13 @@ public class ExtensionUtils implements ContextMenuItemsProvider {
             new Thread(() -> xssChecker.runContextMenuXssTest(requestResponse)).start();
         });
         menuItems.add(xssTestItem);
+
+        // CMDi Test Menu Item
+        JMenuItem cmdiTestItem = new JMenuItem("Run Command Injection Test");
+        cmdiTestItem.addActionListener(e -> {
+            logger.log("CONTEXT", "Running Command Injection test from context menu for URL: " + requestResponse.request().url());
+            new Thread(() -> cmdInjectionChecker.runContextMenuCmdiTest(requestResponse)).start();
+        });
+        menuItems.add(cmdiTestItem);
     }
 }

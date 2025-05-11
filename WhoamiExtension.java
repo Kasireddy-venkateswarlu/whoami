@@ -1,4 +1,3 @@
-// WhoamiExtension.java
 package whoami;
 
 import burp.api.montoya.BurpExtension;
@@ -9,6 +8,7 @@ import burp.api.montoya.proxy.http.ProxyRequestReceivedAction;
 import burp.api.montoya.proxy.http.ProxyRequestToBeSentAction;
 import whoami.checkers.SQLiChecker;
 import whoami.checkers.XSSChecker;
+import whoami.checkers.CMDInjectionChecker;
 import whoami.core.CoreModules;
 import whoami.core.ExtensionUtils;
 import whoami.ui.UIManager;
@@ -21,6 +21,7 @@ public class WhoamiExtension implements BurpExtension {
     private CoreModules core;
     private SQLiChecker sqliChecker;
     private XSSChecker xssChecker;
+    private CMDInjectionChecker cmdInjectionChecker;
     private ExecutorService executorService;
 
     @Override
@@ -35,10 +36,11 @@ public class WhoamiExtension implements BurpExtension {
         core = new CoreModules(api, uiManager);
         sqliChecker = new SQLiChecker(core);
         xssChecker = new XSSChecker(core);
+        cmdInjectionChecker = new CMDInjectionChecker(core);
 
         // Register context menu provider
-        api.userInterface().registerContextMenuItemsProvider(new ExtensionUtils(api, core.logger, sqliChecker, xssChecker));
-        core.logger.logToOutput("Registered context menu provider for SQLi and XSS testing");
+        api.userInterface().registerContextMenuItemsProvider(new ExtensionUtils(api, core.logger, sqliChecker, xssChecker, cmdInjectionChecker));
+        core.logger.logToOutput("Registered context menu provider for SQLi, XSS, and CMDi testing");
 
         api.proxy().registerRequestHandler(new ProxyRequestHandler() {
             @Override
@@ -84,12 +86,17 @@ public class WhoamiExtension implements BurpExtension {
                     executorService.submit(() -> xssChecker.checkForXSS(interceptedRequest));
                 }
 
+                // Process Command Injection asynchronously
+                if (core.uiManager.getConfig().getCheckers().getOrDefault("CMDi", false)) {
+                    executorService.submit(() -> cmdInjectionChecker.checkForCMDi(interceptedRequest));
+                }
+
                 // Send original request immediately
                 return ProxyRequestToBeSentAction.continueWith(interceptedRequest);
             }
         });
 
-        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection testing, XSS testing, JSON handling, and context menu.");
+        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection, XSS, and Command Injection testing, JSON handling, and context menu.");
     }
 
     private boolean hasExcludedExtension(String url, Set<String> excludedExtensions) {

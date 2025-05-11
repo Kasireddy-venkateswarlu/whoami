@@ -1,4 +1,3 @@
-// ui/UIManager.java
 package whoami.ui;
 
 import burp.api.montoya.MontoyaApi;
@@ -69,6 +68,9 @@ public class UIManager {
         JCheckBox xssCheckbox = new JCheckBox("Enable XSS Testing");
         xssCheckbox.addActionListener(e -> config.getCheckers().put("XSS", xssCheckbox.isSelected()));
 
+        JCheckBox cmdiCheckbox = new JCheckBox("Enable Command Injection Testing");
+        cmdiCheckbox.addActionListener(e -> config.getCheckers().put("CMDi", cmdiCheckbox.isSelected()));
+
         JCheckBox testCookiesCheckbox = new JCheckBox("Test Cookie Parameters");
         testCookiesCheckbox.addActionListener(e -> config.setTestCookies(testCookiesCheckbox.isSelected()));
 
@@ -95,6 +97,7 @@ public class UIManager {
         JPanel testPanel = new JPanel(new GridLayout(8, 1));
         testPanel.add(sqlInjectionCheckbox);
         testPanel.add(xssCheckbox);
+        testPanel.add(cmdiCheckbox);
         testPanel.add(testCookiesCheckbox);
         testPanel.add(new JLabel("Excluded File Extensions (comma-separated):"));
         testPanel.add(new JScrollPane(excludedExtensionsArea));
