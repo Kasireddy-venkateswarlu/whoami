@@ -18,7 +18,11 @@ import java.util.regex.Pattern;
 
 public class XSSChecker {
     private final CoreModules core;
-    private static final String XSS_PAYLOAD = "<h1>hai</h1>";
+    private static final String[] XSS_PAYLOADS = {
+        "<h1>hai</h1>",
+        "'-prompt(1)-'",
+        "\" onmouseover=\"confirm(1)\""
+    };
 
     public XSSChecker(CoreModules core) {
         this.core = core;
@@ -33,60 +37,85 @@ public class XSSChecker {
         String method = request.method();
         core.logger.log("XSS", "Starting XSS testing for URL: " + url + ", Method: " + method + ", Bypass Delay: " + bypassDelay);
 
-        // Handle standard parameters
-        boolean hasStandardParameters = false;
+        boolean hasParameters = false;
         for (HttpParameter parameter : request.parameters()) {
             if (parameter.type() == HttpParameterType.JSON) {
-                core.logger.log("XSS", "Skipping JSON parameter: " + parameter.name());
+                core.logger.log("XSS", "Skipping JSON parameter in parameter list: " + parameter.name());
                 continue;
             }
             if (parameter.type() == HttpParameterType.COOKIE && !core.uiManager.getConfig().isTestCookies()) {
                 core.logger.log("XSS", "Skipping COOKIE parameter due to toggle: " + parameter.name());
                 continue;
             }
-            hasStandardParameters = true;
+            hasParameters = true;
 
             String name = parameter.name();
             String value = parameter.value();
             HttpParameterType type = parameter.type();
 
-            // Try unencoded payload
-            HttpParameter paramWithPayload = HttpParameter.parameter(name, value + XSS_PAYLOAD, type);
-            HttpRequest req = request.withUpdatedParameters(paramWithPayload);
-            core.logger.log("XSS", "Sending unencoded payload for parameter: " + name);
-            HttpRequestResponse resp = core.requestSender.sendRequest(req, "", false, bypassDelay);
-            int statusCode = resp.response() != null ? resp.response().statusCode() : -1;
+            for (String payload : XSS_PAYLOADS) {
+                // Try unencoded payload
+                HttpParameter paramWithPayload = HttpParameter.parameter(name, value + payload, type);
+                HttpRequest req = request.withUpdatedParameters(paramWithPayload);
+                core.logger.log("XSS", "Sending unencoded payload for parameter: " + name + ", Payload: " + payload);
+                HttpRequestResponse resp = core.requestSender.sendRequest(req, "", false, bypassDelay);
+                int statusCode = resp.response() != null ? resp.response().statusCode() : -1;
 
-            // If 400, retry with encoded payload
-            if (statusCode == 400) {
-                String encodedPayload = core.getApi().utilities().urlUtils().encode(XSS_PAYLOAD);
-                paramWithPayload = HttpParameter.parameter(name, value + encodedPayload, type);
-                req = request.withUpdatedParameters(paramWithPayload);
-                core.logger.log("XSS", "Retrying with encoded payload for parameter: " + name);
-                resp = core.requestSender.sendRequest(req, "", false, bypassDelay);
-            }
+                // Check for 500 Internal Server Error
+                if (statusCode == 500) {
+                    core.logger.log("XSS", "[ERROR] 500 Internal Server Error detected for parameter: " + name + " with payload: " + payload);
+                    Annotations annotations = Annotations.annotations()
+                            .withHighlightColor(HighlightColor.CYAN)
+                            .withNotes("500 Internal Server Error detected in parameter: " + name + "\n" +
+                                       "Payload: " + payload + "\n" +
+                                       "This may indicate a potential issue but is not a confirmed vulnerability.");
+                    core.getApi().siteMap().add(resp.withAnnotations(annotations));
+                }
 
-            // Check if response is not JSON and contains the unencoded payload
-            String contentType = resp.response() != null ? resp.response().headerValue("Content-Type") : null;
-            if (contentType != null && contentType.contains("application/json")) {
-                core.logger.log("XSS", "Skipping JSON response for parameter: " + name);
-                continue;
-            }
+                // If 400, retry with encoded payload
+                if (statusCode == 400) {
+                    String encodedPayload = core.getApi().utilities().urlUtils().encode(payload);
+                    paramWithPayload = HttpParameter.parameter(name, value + encodedPayload, type);
+                    req = request.withUpdatedParameters(paramWithPayload);
+                    core.logger.log("XSS", "Retrying with encoded payload for parameter: " + name + ", Payload: " + payload);
+                    resp = core.requestSender.sendRequest(req, "", false, bypassDelay);
+                    statusCode = resp.response() != null ? resp.response().statusCode() : -1;
 
-            String responseBody = resp.response() != null ? resp.response().bodyToString() : "";
-            if (responseBody.contains(XSS_PAYLOAD)) {
-                core.logger.log("XSS", "[VULNERABLE] XSS found for parameter: " + name + " with payload: " + XSS_PAYLOAD);
-                Annotations annotations = Annotations.annotations()
-                        .withHighlightColor(HighlightColor.RED)
-                        .withNotes("XSS found in parameter: " + name + "\n" +
-                                   "Payload: " + XSS_PAYLOAD + "\n" +
-                                   "Unencoded payload reflected in response body, indicating potential XSS vulnerability.");
-                core.getApi().siteMap().add(resp.withAnnotations(annotations));
+                    // Check for 500 Internal Server Error on encoded payload
+                    if (statusCode == 500) {
+                        core.logger.log("XSS", "[ERROR] 500 Internal Server Error detected for parameter: " + name + " with encoded payload: " + payload);
+                        Annotations annotations = Annotations.annotations()
+                                .withHighlightColor(HighlightColor.CYAN)
+                                .withNotes("500 Internal Server Error detected in parameter: " + name + "\n" +
+                                           "Payload: " + payload + "\n" +
+                                           "Encoded Payload: " + encodedPayload + "\n" +
+                                           "This may indicate a potential issue but is not a confirmed vulnerability.");
+                        core.getApi().siteMap().add(resp.withAnnotations(annotations));
+                    }
+                }
+
+                // Check if response is not JSON and contains the unencoded payload
+                String contentType = resp.response() != null ? resp.response().headerValue("Content-Type") : null;
+                if (contentType != null && contentType.contains("application/json")) {
+                    core.logger.log("XSS", "Skipping JSON response for parameter: " + name);
+                    continue;
+                }
+
+                String responseBody = resp.response() != null ? resp.response().bodyToString() : "";
+                if (responseBody.contains(payload)) {
+                    core.logger.log("XSS", "[VULNERABLE] XSS found for parameter: " + name + " with payload: " + payload);
+                    Annotations annotations = Annotations.annotations()
+                            .withHighlightColor(HighlightColor.RED)
+                            .withNotes("XSS found in parameter: " + name + "\n" +
+                                       "Payload: " + payload + "\n" +
+                                       "Unencoded payload reflected in response body, indicating potential XSS vulnerability.");
+                    core.getApi().siteMap().add(resp.withAnnotations(annotations));
+                }
             }
         }
 
-        if (!hasStandardParameters) {
-            core.logger.log("XSS", "No standard parameters found to test");
+        if (!hasParameters) {
+            core.logger.log("XSS", "No testable standard parameters found");
         }
 
         // Handle JSON parameters for POST/PUT
@@ -181,40 +210,44 @@ public class XSSChecker {
     private void testJsonPath(String path, String url, HttpRequest originalRequest, boolean bypassDelay, String... stringValue) {
         String value = stringValue.length > 0 ? stringValue[0] : "";
         JSONObject modifiedJson = new JSONObject(originalRequest.bodyToString());
-        if (setJsonValue(modifiedJson, path, value + XSS_PAYLOAD)) {
-            HttpRequest req = originalRequest.withBody(modifiedJson.toString());
-            core.logger.log("JSON", "Sending unencoded XSS payload for: " + path);
-            HttpRequestResponse resp = core.requestSender.sendRequest(req, "", false, bypassDelay);
-            int statusCode = resp.response() != null ? resp.response().statusCode() : -1;
+        for (String payload : XSS_PAYLOADS) {
+            if (setJsonValue(modifiedJson, path, value + payload)) {
+                HttpRequest req = originalRequest.withBody(modifiedJson.toString());
+                core.logger.log("JSON", "Sending raw XSS payload for: " + path + ", Payload: " + payload);
+                HttpRequestResponse resp = core.requestSender.sendRequest(req, "", false, bypassDelay);
+                int statusCode = resp.response() != null ? resp.response().statusCode() : -1;
 
-            // If 400, retry with encoded payload
-            if (statusCode == 400) {
-                String encodedPayload = core.getApi().utilities().urlUtils().encode(XSS_PAYLOAD);
-                modifiedJson = new JSONObject(originalRequest.bodyToString());
-                if (setJsonValue(modifiedJson, path, value + encodedPayload)) {
-                    req = originalRequest.withBody(modifiedJson.toString());
-                    core.logger.log("JSON", "Retrying with encoded XSS payload for: " + path);
-                    resp = core.requestSender.sendRequest(req, "", false, bypassDelay);
+                // Check for 500 Internal Server Error
+                if (statusCode == 500) {
+                    core.logger.log("JSON", "[ERROR] 500 Internal Server Error detected for JSON parameter: " + path + " with payload: " + payload);
+                    Annotations annotations = Annotations.annotations()
+                            .withHighlightColor(HighlightColor.CYAN)
+                            .withNotes("500 Internal Server Error detected in JSON parameter: " + path + "\n" +
+                                       "Payload: " + payload + "\n" +
+                                       "This may indicate a potential issue but is not a confirmed vulnerability.");
+                    core.getApi().siteMap().add(resp.withAnnotations(annotations));
+                }
+
+                // Check if response is not JSON and contains the unencoded payload
+                String contentType = resp.response() != null ? resp.response().headerValue("Content-Type") : null;
+                if (contentType != null && contentType.contains("application/json")) {
+                    core.logger.log("JSON", "Skipping JSON response for parameter: " + path);
+                    continue;
+                }
+
+                String responseBody = resp.response() != null ? resp.response().bodyToString() : "";
+                if (responseBody.contains(payload)) {
+                    core.logger.log("JSON", "[VULNERABLE] XSS found for JSON parameter: " + path + " with payload: " + payload);
+                    Annotations annotations = Annotations.annotations()
+                            .withHighlightColor(HighlightColor.RED)
+                            .withNotes("XSS found in JSON parameter: " + path + "\n" +
+                                       "Payload: " + payload + "\n" +
+                                       "Unencoded payload reflected in response body, indicating potential XSS vulnerability.");
+                    core.getApi().siteMap().add(resp.withAnnotations(annotations));
                 }
             }
-
-            // Check if response is not JSON and contains the unencoded payload
-            String contentType = resp.response() != null ? resp.response().headerValue("Content-Type") : null;
-            if (contentType != null && contentType.contains("application/json")) {
-                core.logger.log("JSON", "Skipping JSON response for: " + path);
-                return;
-            }
-
-            String responseBody = resp.response() != null ? resp.response().bodyToString() : "";
-            if (responseBody.contains(XSS_PAYLOAD)) {
-                core.logger.log("JSON", "[VULNERABLE] XSS found for: " + path + " with payload: " + XSS_PAYLOAD);
-                Annotations annotations = Annotations.annotations()
-                        .withHighlightColor(HighlightColor.RED)
-                        .withNotes("XSS found in JSON parameter: " + path + "\n" +
-                                   "Payload: " + XSS_PAYLOAD + "\n" +
-                                   "Unencoded payload reflected in response body, indicating potential XSS vulnerability.");
-                core.getApi().siteMap().add(resp.withAnnotations(annotations));
-            }
+            // Reset JSON for next payload
+            modifiedJson = new JSONObject(originalRequest.bodyToString());
         }
     }
 

@@ -14,7 +14,9 @@ import org.json.JSONException;
 import whoami.core.CoreModules;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -50,6 +52,7 @@ public class CMDInjectionChecker {
 
         // Handle standard parameters
         boolean hasStandardParameters = false;
+        Map<String, HttpRequestResponse> payloadResponseMap = new HashMap<>();
         for (HttpParameter parameter : request.parameters()) {
             if (parameter.type() == HttpParameterType.JSON) {
                 core.logger.log("CMDi", "Skipping JSON parameter: " + parameter.name());
@@ -72,23 +75,42 @@ public class CMDInjectionChecker {
                 HttpRequest req = request.withUpdatedParameters(paramWithPayload);
                 core.logger.log("CMDi", "Sending encoded payload for parameter: " + name + ", Payload: " + payload);
                 HttpRequestResponse resp = core.requestSender.sendRequest(req, "", false, bypassDelay);
+                payloadResponseMap.put(name + ":" + payload, resp);
 
-                // Wait for potential Collaborator interactions (5 seconds)
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException e) {
-                    core.logger.logError("CMDi", "Interrupted while waiting for Collaborator interactions: " + e.getMessage());
-                }
-
-                // Check for DNS or HTTP interactions
-                List<Interaction> interactions = collaboratorClient.getAllInteractions();
-                if (!interactions.isEmpty()) {
-                    core.logger.log("CMDi", "[VULNERABLE] Command Injection found for parameter: " + name + " with payload: " + payload);
+                // Check for 500 Internal Server Error
+                if (resp.response() != null && resp.response().statusCode() == 500) {
+                    core.logger.log("CMDi", "[ERROR] 500 Internal Server Error detected for parameter: " + name + " with payload: " + payload);
                     Annotations annotations = Annotations.annotations()
-                            .withHighlightColor(HighlightColor.RED)
-                            .withNotes("Command Injection found in parameter: " + name + "\n" +
+                            .withHighlightColor(HighlightColor.ORANGE)
+                            .withNotes("500 Internal Server Error detected in parameter: " + name + "\n" +
                                        "Payload: " + payload + "\n" +
                                        "Encoded Payload: " + encodedPayload + "\n" +
+                                       "This may indicate a potential issue but is not a confirmed vulnerability.");
+                    core.getApi().siteMap().add(resp.withAnnotations(annotations));
+                }
+            }
+
+            // Wait for potential Collaborator interactions (5 seconds)
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                core.logger.logError("CMDi", "Interrupted while waiting for Collaborator interactions: " + e.getMessage());
+            }
+
+            // Check for DNS or HTTP interactions
+            List<Interaction> interactions = collaboratorClient.getAllInteractions();
+            if (!interactions.isEmpty()) {
+                for (String key : payloadResponseMap.keySet()) {
+                    String[] parts = key.split(":", 2);
+                    String paramName = parts[0];
+                    String payload = parts[1];
+                    HttpRequestResponse resp = payloadResponseMap.get(key);
+                    core.logger.log("CMDi", "[VULNERABLE] Command Injection found for parameter: " + paramName + " with payload: " + payload);
+                    Annotations annotations = Annotations.annotations()
+                            .withHighlightColor(HighlightColor.RED)
+                            .withNotes("Command Injection found in parameter: " + paramName + "\n" +
+                                       "Payload: " + payload + "\n" +
+                                       "Encoded Payload: " + core.getApi().utilities().urlUtils().encode(payload) + "\n" +
                                        "Collaborator interaction detected, indicating command execution.\n" +
                                        "Interaction details: " + interactions.get(0).type().toString());
                     core.getApi().siteMap().add(resp.withAnnotations(annotations));
@@ -192,35 +214,54 @@ public class CMDInjectionChecker {
     private void testJsonPath(String path, String url, HttpRequest originalRequest, boolean bypassDelay, String... stringValue) {
         String value = stringValue.length > 0 ? stringValue[0] : "";
         JSONObject modifiedJson = new JSONObject(originalRequest.bodyToString());
+        Map<String, HttpRequestResponse> payloadResponseMap = new HashMap<>();
         for (String payloadTemplate : COMMAND_INJECTION_PAYLOADS) {
             String payload = String.format(payloadTemplate, collaboratorPayload);
             if (setJsonValue(modifiedJson, path, value + payload)) {
                 HttpRequest req = originalRequest.withBody(modifiedJson.toString());
                 core.logger.log("JSON", "Sending raw CMDi payload for: " + path + ", Payload: " + payload);
                 HttpRequestResponse resp = core.requestSender.sendRequest(req, "", false, bypassDelay);
+                payloadResponseMap.put(path + ":" + payload, resp);
 
-                // Wait for potential Collaborator interactions (5 seconds)
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException e) {
-                    core.logger.logError("JSON", "Interrupted while waiting for Collaborator interactions: " + e.getMessage());
-                }
-
-                // Check for DNS or HTTP interactions
-                List<Interaction> interactions = collaboratorClient.getAllInteractions();
-                if (!interactions.isEmpty()) {
-                    core.logger.log("JSON", "[VULNERABLE] Command Injection found for: " + path + " with payload: " + payload);
+                // Check for 500 Internal Server Error
+                if (resp.response() != null && resp.response().statusCode() == 500) {
+                    core.logger.log("JSON", "[ERROR] 500 Internal Server Error detected for JSON parameter: " + path + " with payload: " + payload);
                     Annotations annotations = Annotations.annotations()
-                            .withHighlightColor(HighlightColor.RED)
-                            .withNotes("Command Injection found in JSON parameter: " + path + "\n" +
+                            .withHighlightColor(HighlightColor.ORANGE)
+                            .withNotes("500 Internal Server Error detected in JSON parameter: " + path + "\n" +
                                        "Payload: " + payload + "\n" +
-                                       "Collaborator interaction detected, indicating command execution.\n" +
-                                       "Interaction details: " + interactions.get(0).type().toString());
+                                       "This may indicate a potential issue but is not a confirmed vulnerability.");
                     core.getApi().siteMap().add(resp.withAnnotations(annotations));
                 }
             }
             // Reset JSON for next payload
             modifiedJson = new JSONObject(originalRequest.bodyToString());
+        }
+
+        // Wait for potential Collaborator interactions (5 seconds)
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            core.logger.logError("JSON", "Interrupted while waiting for Collaborator interactions: " + e.getMessage());
+        }
+
+        // Check for DNS or HTTP interactions
+        List<Interaction> interactions = collaboratorClient.getAllInteractions();
+        if (!interactions.isEmpty()) {
+            for (String key : payloadResponseMap.keySet()) {
+                String[] parts = key.split(":", 2);
+                String paramPath = parts[0];
+                String payload = parts[1];
+                HttpRequestResponse resp = payloadResponseMap.get(key);
+                core.logger.log("JSON", "[VULNERABLE] Command Injection found for JSON parameter: " + paramPath + " with payload: " + payload);
+                Annotations annotations = Annotations.annotations()
+                        .withHighlightColor(HighlightColor.RED)
+                        .withNotes("Command Injection found in JSON parameter: " + paramPath + "\n" +
+                                   "Payload: " + payload + "\n" +
+                                   "Collaborator interaction detected, indicating command execution.\n" +
+                                   "Interaction details: " + interactions.get(0).type().toString());
+                core.getApi().siteMap().add(resp.withAnnotations(annotations));
+            }
         }
     }
 
