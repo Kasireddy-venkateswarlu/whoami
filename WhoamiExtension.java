@@ -9,6 +9,7 @@ import burp.api.montoya.proxy.http.ProxyRequestToBeSentAction;
 import whoami.checkers.SQLiChecker;
 import whoami.checkers.XSSChecker;
 import whoami.checkers.CMDInjectionChecker;
+import whoami.checkers.SSRFChecker;
 import whoami.core.CoreModules;
 import whoami.core.ExtensionUtils;
 import whoami.ui.UIManager;
@@ -22,6 +23,7 @@ public class WhoamiExtension implements BurpExtension {
     private SQLiChecker sqliChecker;
     private XSSChecker xssChecker;
     private CMDInjectionChecker cmdInjectionChecker;
+    private SSRFChecker ssrfChecker;
     private ExecutorService executorService;
 
     @Override
@@ -37,10 +39,11 @@ public class WhoamiExtension implements BurpExtension {
         sqliChecker = new SQLiChecker(core);
         xssChecker = new XSSChecker(core);
         cmdInjectionChecker = new CMDInjectionChecker(core);
+        ssrfChecker = new SSRFChecker(core);
 
         // Register context menu provider
-        api.userInterface().registerContextMenuItemsProvider(new ExtensionUtils(api, core.logger, sqliChecker, xssChecker, cmdInjectionChecker));
-        core.logger.logToOutput("Registered context menu provider for SQLi, XSS, and CMDi testing");
+        api.userInterface().registerContextMenuItemsProvider(new ExtensionUtils(api, core.logger, sqliChecker, xssChecker, cmdInjectionChecker, ssrfChecker));
+        core.logger.logToOutput("Registered context menu provider for SQLi, XSS, CMDi, and SSRF testing");
 
         api.proxy().registerRequestHandler(new ProxyRequestHandler() {
             @Override
@@ -91,12 +94,17 @@ public class WhoamiExtension implements BurpExtension {
                     executorService.submit(() -> cmdInjectionChecker.checkForCMDi(interceptedRequest));
                 }
 
+                // Process SSRF asynchronously
+                if (core.uiManager.getConfig().getCheckers().getOrDefault("SSRF", false)) {
+                    executorService.submit(() -> ssrfChecker.checkForSSRF(interceptedRequest));
+                }
+
                 // Send original request immediately
                 return ProxyRequestToBeSentAction.continueWith(interceptedRequest);
             }
         });
 
-        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection, XSS, and Command Injection testing, JSON handling, and context menu.");
+        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection, XSS, Command Injection, and SSRF testing, JSON handling, and context menu.");
     }
 
     private boolean hasExcludedExtension(String url, Set<String> excludedExtensions) {

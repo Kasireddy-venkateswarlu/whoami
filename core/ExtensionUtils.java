@@ -7,6 +7,7 @@ import burp.api.montoya.ui.contextmenu.ContextMenuItemsProvider;
 import whoami.checkers.SQLiChecker;
 import whoami.checkers.XSSChecker;
 import whoami.checkers.CMDInjectionChecker;
+import whoami.checkers.SSRFChecker;
 
 import javax.swing.*;
 import java.awt.*;
@@ -19,13 +20,15 @@ public class ExtensionUtils implements ContextMenuItemsProvider {
     private final SQLiChecker sqliChecker;
     private final XSSChecker xssChecker;
     private final CMDInjectionChecker cmdInjectionChecker;
+    private final SSRFChecker ssrfChecker;
 
-    public ExtensionUtils(MontoyaApi api, Logger logger, SQLiChecker sqliChecker, XSSChecker xssChecker, CMDInjectionChecker cmdInjectionChecker) {
+    public ExtensionUtils(MontoyaApi api, Logger logger, SQLiChecker sqliChecker, XSSChecker xssChecker, CMDInjectionChecker cmdInjectionChecker, SSRFChecker ssrfChecker) {
         this.api = api;
         this.logger = logger;
         this.sqliChecker = sqliChecker;
         this.xssChecker = xssChecker;
         this.cmdInjectionChecker = cmdInjectionChecker;
+        this.ssrfChecker = ssrfChecker;
         logger.log("CONTEXT", "ContextMenuItemsProvider initialized");
     }
 
@@ -92,5 +95,13 @@ public class ExtensionUtils implements ContextMenuItemsProvider {
             new Thread(() -> cmdInjectionChecker.runContextMenuCmdiTest(requestResponse)).start();
         });
         menuItems.add(cmdiTestItem);
+
+        // SSRF Test Menu Item
+        JMenuItem ssrfTestItem = new JMenuItem("Run SSRF Test");
+        ssrfTestItem.addActionListener(e -> {
+            logger.log("CONTEXT", "Running SSRF test from context menu for URL: " + requestResponse.request().url());
+            new Thread(() -> ssrfChecker.runContextMenuSsrfTest(requestResponse)).start();
+        });
+        menuItems.add(ssrfTestItem);
     }
 }

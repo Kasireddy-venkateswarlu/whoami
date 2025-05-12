@@ -71,6 +71,9 @@ public class UIManager {
         JCheckBox cmdiCheckbox = new JCheckBox("Enable Command Injection Testing");
         cmdiCheckbox.addActionListener(e -> config.getCheckers().put("CMDi", cmdiCheckbox.isSelected()));
 
+        JCheckBox ssrfCheckbox = new JCheckBox("Enable SSRF Testing");
+        ssrfCheckbox.addActionListener(e -> config.getCheckers().put("SSRF", ssrfCheckbox.isSelected()));
+
         JCheckBox testCookiesCheckbox = new JCheckBox("Test Cookie Parameters");
         testCookiesCheckbox.addActionListener(e -> config.setTestCookies(testCookiesCheckbox.isSelected()));
 
@@ -94,10 +97,11 @@ public class UIManager {
         JPanel centerPanel = new JPanel(new BorderLayout());
         centerPanel.add(new JLabel("Allowed HTTP Methods:"), BorderLayout.NORTH);
         centerPanel.add(methodPanel, BorderLayout.CENTER);
-        JPanel testPanel = new JPanel(new GridLayout(8, 1));
+        JPanel testPanel = new JPanel(new GridLayout(9, 1)); // Increased to 9 for SSRF checkbox
         testPanel.add(sqlInjectionCheckbox);
         testPanel.add(xssCheckbox);
         testPanel.add(cmdiCheckbox);
+        testPanel.add(ssrfCheckbox);
         testPanel.add(testCookiesCheckbox);
         testPanel.add(new JLabel("Excluded File Extensions (comma-separated):"));
         testPanel.add(new JScrollPane(excludedExtensionsArea));
