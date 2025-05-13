@@ -6,3 +6,5 @@ cd out
 git add .
 git commit -m "Updated extension files"
 git push origin main
+
+
