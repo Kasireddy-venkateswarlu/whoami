@@ -10,6 +10,8 @@ import whoami.checkers.SQLiChecker;
 import whoami.checkers.XSSChecker;
 import whoami.checkers.CMDInjectionChecker;
 import whoami.checkers.SSRFChecker;
+import whoami.checkers.SSTIChecker;
+import whoami.checkers.XXEChecker;
 import whoami.core.CoreModules;
 import whoami.core.ExtensionUtils;
 import whoami.ui.UIManager;
@@ -24,6 +26,8 @@ public class WhoamiExtension implements BurpExtension {
     private XSSChecker xssChecker;
     private CMDInjectionChecker cmdInjectionChecker;
     private SSRFChecker ssrfChecker;
+    private SSTIChecker sstiChecker;
+    private XXEChecker xxeChecker;
     private ExecutorService executorService;
 
     @Override
@@ -40,10 +44,12 @@ public class WhoamiExtension implements BurpExtension {
         xssChecker = new XSSChecker(core);
         cmdInjectionChecker = new CMDInjectionChecker(core);
         ssrfChecker = new SSRFChecker(core);
+        sstiChecker = new SSTIChecker(core);
+        xxeChecker = new XXEChecker(core);
 
         // Register context menu provider
-        api.userInterface().registerContextMenuItemsProvider(new ExtensionUtils(api, core.logger, sqliChecker, xssChecker, cmdInjectionChecker, ssrfChecker));
-        core.logger.logToOutput("Registered context menu provider for SQLi, XSS, CMDi, and SSRF testing");
+        api.userInterface().registerContextMenuItemsProvider(new ExtensionUtils(api, core.logger, sqliChecker, xssChecker, cmdInjectionChecker, ssrfChecker, sstiChecker, xxeChecker));
+        core.logger.logToOutput("Registered context menu provider for SQLi, XSS, CMDi, SSRF, SSTI, and XXE testing");
 
         api.proxy().registerRequestHandler(new ProxyRequestHandler() {
             @Override
@@ -99,12 +105,22 @@ public class WhoamiExtension implements BurpExtension {
                     executorService.submit(() -> ssrfChecker.checkForSSRF(interceptedRequest));
                 }
 
+                // Process SSTI asynchronously
+                if (core.uiManager.getConfig().getCheckers().getOrDefault("SSTI", false)) {
+                    executorService.submit(() -> sstiChecker.checkForSSTI(interceptedRequest));
+                }
+
+                // Process XXE asynchronously
+                if (core.uiManager.getConfig().getCheckers().getOrDefault("XXE", false)) {
+                    executorService.submit(() -> xxeChecker.checkForXXE(interceptedRequest));
+                }
+
                 // Send original request immediately
                 return ProxyRequestToBeSentAction.continueWith(interceptedRequest);
             }
         });
 
-        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection, XSS, Command Injection, and SSRF testing, JSON handling, and context menu.");
+        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection, XSS, Command Injection, SSRF, SSTI, and XXE testing, JSON handling, and context menu.");
     }
 
     private boolean hasExcludedExtension(String url, Set<String> excludedExtensions) {

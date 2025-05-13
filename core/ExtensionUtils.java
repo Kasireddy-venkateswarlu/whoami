@@ -8,6 +8,8 @@ import whoami.checkers.SQLiChecker;
 import whoami.checkers.XSSChecker;
 import whoami.checkers.CMDInjectionChecker;
 import whoami.checkers.SSRFChecker;
+import whoami.checkers.SSTIChecker;
+import whoami.checkers.XXEChecker;
 
 import javax.swing.*;
 import java.awt.*;
@@ -21,14 +23,18 @@ public class ExtensionUtils implements ContextMenuItemsProvider {
     private final XSSChecker xssChecker;
     private final CMDInjectionChecker cmdInjectionChecker;
     private final SSRFChecker ssrfChecker;
+    private final SSTIChecker sstiChecker;
+    private final XXEChecker xxeChecker;
 
-    public ExtensionUtils(MontoyaApi api, Logger logger, SQLiChecker sqliChecker, XSSChecker xssChecker, CMDInjectionChecker cmdInjectionChecker, SSRFChecker ssrfChecker) {
+    public ExtensionUtils(MontoyaApi api, Logger logger, SQLiChecker sqliChecker, XSSChecker xssChecker, CMDInjectionChecker cmdInjectionChecker, SSRFChecker ssrfChecker, SSTIChecker sstiChecker, XXEChecker xxeChecker) {
         this.api = api;
         this.logger = logger;
         this.sqliChecker = sqliChecker;
         this.xssChecker = xssChecker;
         this.cmdInjectionChecker = cmdInjectionChecker;
         this.ssrfChecker = ssrfChecker;
+        this.sstiChecker = sstiChecker;
+        this.xxeChecker = xxeChecker;
         logger.log("CONTEXT", "ContextMenuItemsProvider initialized");
     }
 
@@ -103,5 +109,21 @@ public class ExtensionUtils implements ContextMenuItemsProvider {
             new Thread(() -> ssrfChecker.runContextMenuSsrfTest(requestResponse)).start();
         });
         menuItems.add(ssrfTestItem);
+
+        // SSTI Test Menu Item
+        JMenuItem sstiTestItem = new JMenuItem("Run SSTI Test");
+        sstiTestItem.addActionListener(e -> {
+            logger.log("CONTEXT", "Running SSTI test from context menu for URL: " + requestResponse.request().url());
+            new Thread(() -> sstiChecker.runContextMenuSstiTest(requestResponse)).start();
+        });
+        menuItems.add(sstiTestItem);
+
+        // XXE Test Menu Item
+        JMenuItem xxeTestItem = new JMenuItem("Run XXE Test");
+        xxeTestItem.addActionListener(e -> {
+            logger.log("CONTEXT", "Running XXE test from context menu for URL: " + requestResponse.request().url());
+            new Thread(() -> xxeChecker.runContextMenuXxeTest(requestResponse)).start();
+        });
+        menuItems.add(xxeTestItem);
     }
 }
