@@ -6,11 +6,12 @@ import burp.api.montoya.proxy.http.InterceptedRequest;
 import burp.api.montoya.proxy.http.ProxyRequestHandler;
 import burp.api.montoya.proxy.http.ProxyRequestReceivedAction;
 import burp.api.montoya.proxy.http.ProxyRequestToBeSentAction;
-import whoami.checkers.SQLiChecker;
-import whoami.checkers.XSSChecker;
 import whoami.checkers.CMDInjectionChecker;
+import whoami.checkers.NoSQLIChecker;
 import whoami.checkers.SSRFChecker;
 import whoami.checkers.SSTIChecker;
+import whoami.checkers.SQLiChecker;
+import whoami.checkers.XSSChecker;
 import whoami.checkers.XXEChecker;
 import whoami.core.CoreModules;
 import whoami.core.ExtensionUtils;
@@ -28,6 +29,7 @@ public class WhoamiExtension implements BurpExtension {
     private SSRFChecker ssrfChecker;
     private SSTIChecker sstiChecker;
     private XXEChecker xxeChecker;
+    private NoSQLIChecker noSQLIChecker;
     private ExecutorService executorService;
 
     @Override
@@ -46,10 +48,11 @@ public class WhoamiExtension implements BurpExtension {
         ssrfChecker = new SSRFChecker(core);
         sstiChecker = new SSTIChecker(core);
         xxeChecker = new XXEChecker(core);
+        noSQLIChecker = new NoSQLIChecker(core);
 
         // Register context menu provider
-        api.userInterface().registerContextMenuItemsProvider(new ExtensionUtils(api, core.logger, sqliChecker, xssChecker, cmdInjectionChecker, ssrfChecker, sstiChecker, xxeChecker));
-        core.logger.logToOutput("Registered context menu provider for SQLi, XSS, CMDi, SSRF, SSTI, and XXE testing");
+        api.userInterface().registerContextMenuItemsProvider(new ExtensionUtils(api, core.logger, sqliChecker, xssChecker, cmdInjectionChecker, ssrfChecker, sstiChecker, xxeChecker, noSQLIChecker));
+        core.logger.logToOutput("Registered context menu provider for SQLi, XSS, CMDi, SSRF, SSTI, XXE, and NoSQLI testing");
 
         api.proxy().registerRequestHandler(new ProxyRequestHandler() {
             @Override
@@ -115,12 +118,17 @@ public class WhoamiExtension implements BurpExtension {
                     executorService.submit(() -> xxeChecker.checkForXXE(interceptedRequest));
                 }
 
+                // Process NoSQLI asynchronously
+                if (core.uiManager.getConfig().getCheckers().getOrDefault("NoSQLI", false)) {
+                    executorService.submit(() -> noSQLIChecker.checkForNoSQLI(interceptedRequest));
+                }
+
                 // Send original request immediately
                 return ProxyRequestToBeSentAction.continueWith(interceptedRequest);
             }
         });
 
-        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection, XSS, Command Injection, SSRF, SSTI, and XXE testing, JSON handling, and context menu.");
+        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection, XSS, Command Injection, SSRF, SSTI, XXE, and NoSQLI testing, JSON handling, and context menu.");
     }
 
     private boolean hasExcludedExtension(String url, Set<String> excludedExtensions) {

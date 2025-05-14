@@ -25,19 +25,26 @@ public class UIManager {
 
     public void createTab() {
         SwingUtils swingUtils = api.userInterface().swingUtils();
-        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Banner
+        // Banner with thick orange border
         JLabel bannerLabel = new JLabel("Whoami by kasireddy", SwingConstants.CENTER);
         bannerLabel.setFont(new Font("Arial", Font.BOLD, 18));
         bannerLabel.setForeground(Color.BLACK);
-        mainPanel.add(bannerLabel, BorderLayout.NORTH);
+        bannerLabel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(Color.ORANGE, 3), // Thick orange border
+            BorderFactory.createEmptyBorder(5, 10, 5, 10)    // Inner padding
+        ));
+        bannerLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        mainPanel.add(bannerLabel);
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
         // Top Panel: Toggle and Delay
         JPanel topPanel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.insets = new Insets(3, 5, 3, 5); // Reduced vertical insets for tighter spacing
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
         JLabel statusLabel = new JLabel("Extension is OFF");
@@ -48,7 +55,7 @@ public class UIManager {
             statusLabel.setText(config.isEnabled() ? "Extension is ON" : "Extension is OFF");
         });
 
-        JTextField delayField = new JTextField("0", 5);
+        JTextField delayField = new JTextField("0", 3); // Reduced column size for compact input
         delayField.getDocument().addDocumentListener((SimpleDocumentListener) e -> {
             try {
                 config.setDelayMillis(Integer.parseInt(delayField.getText()) * 1000);
@@ -59,26 +66,20 @@ public class UIManager {
 
         gbc.gridx = 0;
         gbc.gridy = 0;
-        gbc.anchor = GridBagConstraints.WEST;
         topPanel.add(toggle, gbc);
 
         gbc.gridx = 1;
-        gbc.weightx = 1.0;
         topPanel.add(statusLabel, gbc);
 
         gbc.gridx = 0;
         gbc.gridy = 1;
-        gbc.gridwidth = 1;
-        gbc.weightx = 0.0;
         topPanel.add(new JLabel("Delay between requests (seconds):"), gbc);
 
         gbc.gridx = 1;
         topPanel.add(delayField, gbc);
 
-        mainPanel.add(topPanel, BorderLayout.CENTER);
-
-        // Center Panel: Method Filtering, Checkers, and Excluded Extensions
-        JPanel centerPanel = new JPanel(new BorderLayout(5, 5));
+        mainPanel.add(topPanel);
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
         // Method Filtering
         JPanel methodPanel = new JPanel(new GridLayout(2, 4, 10, 10));
@@ -89,18 +90,22 @@ public class UIManager {
             checkbox.addActionListener(e -> config.setMethodAllowed(method, checkbox.isSelected()));
             methodPanel.add(checkbox);
         }
-        centerPanel.add(methodPanel, BorderLayout.NORTH);
+        mainPanel.add(methodPanel);
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
-        // Checkers and Excluded Extensions
+        // Test Options
         JPanel testPanel = new JPanel(new GridBagLayout());
         testPanel.setBorder(BorderFactory.createTitledBorder("Testing Options"));
         GridBagConstraints testGbc = new GridBagConstraints();
-        testGbc.insets = new Insets(5, 5, 5, 5);
+        testGbc.insets = new Insets(2, 5, 2, 5); // Reduced vertical insets for tighter spacing
         testGbc.fill = GridBagConstraints.HORIZONTAL;
         testGbc.anchor = GridBagConstraints.WEST;
 
         JCheckBox sqlInjectionCheckbox = new JCheckBox("Enable SQL Injection Testing");
         sqlInjectionCheckbox.addActionListener(e -> config.getCheckers().put("SQLi", sqlInjectionCheckbox.isSelected()));
+
+        JCheckBox noSQLICheckbox = new JCheckBox("Enable NoSQL Injection Testing");
+        noSQLICheckbox.addActionListener(e -> config.getCheckers().put("NoSQLI", noSQLICheckbox.isSelected()));
 
         JCheckBox xssCheckbox = new JCheckBox("Enable XSS Testing");
         xssCheckbox.addActionListener(e -> config.getCheckers().put("XSS", xssCheckbox.isSelected()));
@@ -120,7 +125,7 @@ public class UIManager {
         JCheckBox testCookiesCheckbox = new JCheckBox("Test Cookie Parameters");
         testCookiesCheckbox.addActionListener(e -> config.setTestCookies(testCookiesCheckbox.isSelected()));
 
-        JTextArea excludedExtensionsArea = new JTextArea(3, 20);
+        JTextArea excludedExtensionsArea = new JTextArea(2, 15); // Reduced to 2 rows, 15 columns
         excludedExtensionsArea.setText(".css,.js,.png,.jpg,.jpeg,.gif,.svg,.ico,.woff,.woff2,.ttf,.eot");
         excludedExtensionsArea.getDocument().addDocumentListener((SimpleDocumentListener) e -> {
             String[] extensions = excludedExtensionsArea.getText().split(",");
@@ -137,37 +142,30 @@ public class UIManager {
             config.setExcludedExtensions(excluded);
         });
 
+        int row = 0;
         testGbc.gridx = 0;
-        testGbc.gridy = 0;
+        testGbc.gridy = row++;
         testPanel.add(sqlInjectionCheckbox, testGbc);
-
-        testGbc.gridy = 1;
+        testGbc.gridy = row++;
+        testPanel.add(noSQLICheckbox, testGbc);
+        testGbc.gridy = row++;
         testPanel.add(xssCheckbox, testGbc);
-
-        testGbc.gridy = 2;
+        testGbc.gridy = row++;
         testPanel.add(cmdiCheckbox, testGbc);
-
-        testGbc.gridy = 3;
+        testGbc.gridy = row++;
         testPanel.add(ssrfCheckbox, testGbc);
-
-        testGbc.gridy = 4;
+        testGbc.gridy = row++;
         testPanel.add(sstiCheckbox, testGbc);
-
-        testGbc.gridy = 5;
+        testGbc.gridy = row++;
         testPanel.add(xxeCheckbox, testGbc);
-
-        testGbc.gridy = 6;
+        testGbc.gridy = row++;
         testPanel.add(testCookiesCheckbox, testGbc);
-
-        testGbc.gridy = 7;
+        testGbc.gridy = row++;
         testPanel.add(new JLabel("Excluded File Extensions (comma-separated):"), testGbc);
-
-        testGbc.gridy = 8;
+        testGbc.gridy = row++;
         testPanel.add(new JScrollPane(excludedExtensionsArea), testGbc);
 
-        centerPanel.add(testPanel, BorderLayout.CENTER);
-
-        mainPanel.add(centerPanel, BorderLayout.SOUTH);
+        mainPanel.add(testPanel);
 
         api.userInterface().registerSuiteTab("whoami", mainPanel);
     }

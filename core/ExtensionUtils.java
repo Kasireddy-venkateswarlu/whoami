@@ -4,11 +4,12 @@ import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.ui.contextmenu.ContextMenuEvent;
 import burp.api.montoya.ui.contextmenu.ContextMenuItemsProvider;
-import whoami.checkers.SQLiChecker;
-import whoami.checkers.XSSChecker;
 import whoami.checkers.CMDInjectionChecker;
+import whoami.checkers.NoSQLIChecker;
 import whoami.checkers.SSRFChecker;
 import whoami.checkers.SSTIChecker;
+import whoami.checkers.SQLiChecker;
+import whoami.checkers.XSSChecker;
 import whoami.checkers.XXEChecker;
 
 import javax.swing.*;
@@ -25,8 +26,9 @@ public class ExtensionUtils implements ContextMenuItemsProvider {
     private final SSRFChecker ssrfChecker;
     private final SSTIChecker sstiChecker;
     private final XXEChecker xxeChecker;
+    private final NoSQLIChecker noSQLIChecker;
 
-    public ExtensionUtils(MontoyaApi api, Logger logger, SQLiChecker sqliChecker, XSSChecker xssChecker, CMDInjectionChecker cmdInjectionChecker, SSRFChecker ssrfChecker, SSTIChecker sstiChecker, XXEChecker xxeChecker) {
+    public ExtensionUtils(MontoyaApi api, Logger logger, SQLiChecker sqliChecker, XSSChecker xssChecker, CMDInjectionChecker cmdInjectionChecker, SSRFChecker ssrfChecker, SSTIChecker sstiChecker, XXEChecker xxeChecker, NoSQLIChecker noSQLIChecker) {
         this.api = api;
         this.logger = logger;
         this.sqliChecker = sqliChecker;
@@ -35,6 +37,7 @@ public class ExtensionUtils implements ContextMenuItemsProvider {
         this.ssrfChecker = ssrfChecker;
         this.sstiChecker = sstiChecker;
         this.xxeChecker = xxeChecker;
+        this.noSQLIChecker = noSQLIChecker;
         logger.log("CONTEXT", "ContextMenuItemsProvider initialized");
     }
 
@@ -125,5 +128,13 @@ public class ExtensionUtils implements ContextMenuItemsProvider {
             new Thread(() -> xxeChecker.runContextMenuXxeTest(requestResponse)).start();
         });
         menuItems.add(xxeTestItem);
+
+        // NoSQLI Test Menu Item
+        JMenuItem noSQLITestItem = new JMenuItem("Run NoSQLI Test");
+        noSQLITestItem.addActionListener(e -> {
+            logger.log("CONTEXT", "Running NoSQLI test from context menu for URL: " + requestResponse.request().url());
+            new Thread(() -> noSQLIChecker.runContextMenuNoSQLITest(requestResponse)).start();
+        });
+        menuItems.add(noSQLITestItem);
     }
 }
