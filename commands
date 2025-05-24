@@ -4,7 +4,7 @@ cd out
 	jar cvf WhoamiExtension.jar .
 
 git add .
-git commit -m "Updated extension files"
+git commit -m "no sql injection [$ne] [$eq]"
 git push origin main
 
 

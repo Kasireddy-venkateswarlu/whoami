@@ -6,6 +6,8 @@ import burp.api.montoya.proxy.http.InterceptedRequest;
 import burp.api.montoya.proxy.http.ProxyRequestHandler;
 import burp.api.montoya.proxy.http.ProxyRequestReceivedAction;
 import burp.api.montoya.proxy.http.ProxyRequestToBeSentAction;
+import burp.api.montoya.http.message.params.HttpParameter;
+import burp.api.montoya.http.message.params.HttpParameterType;
 import whoami.checkers.CMDInjectionChecker;
 import whoami.checkers.NoSQLIChecker;
 import whoami.checkers.SSRFChecker;
@@ -15,8 +17,10 @@ import whoami.checkers.XSSChecker;
 import whoami.checkers.XXEChecker;
 import whoami.core.CoreModules;
 import whoami.core.ExtensionUtils;
+import whoami.core.ScanDatabaseHelper;
 import whoami.ui.UIManager;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,6 +35,7 @@ public class WhoamiExtension implements BurpExtension {
     private XXEChecker xxeChecker;
     private NoSQLIChecker noSQLIChecker;
     private ExecutorService executorService;
+    private ScanDatabaseHelper dbHelper;
 
     @Override
     public void initialize(MontoyaApi api) {
@@ -49,6 +54,8 @@ public class WhoamiExtension implements BurpExtension {
         sstiChecker = new SSTIChecker(core);
         xxeChecker = new XXEChecker(core);
         noSQLIChecker = new NoSQLIChecker(core);
+        dbHelper = new ScanDatabaseHelper(core.logger);
+        uiManager.setDbHelper(dbHelper); // Ensure this line is present
 
         // Register context menu provider
         api.userInterface().registerContextMenuItemsProvider(new ExtensionUtils(api, core.logger, sqliChecker, xssChecker, cmdInjectionChecker, ssrfChecker, sstiChecker, xxeChecker, noSQLIChecker));
@@ -88,6 +95,37 @@ public class WhoamiExtension implements BurpExtension {
 
                 core.logger.logToOutput("Allowed " + method + " request in scope: " + url);
 
+                // Extract endpoint and parameter sets
+                String endpoint = interceptedRequest.pathWithoutQuery();
+                Set<String> queryParams = new HashSet<>();
+                Set<String> cookieParams = new HashSet<>();
+                Set<String> bodyParams = new HashSet<>();
+
+                for (var param : interceptedRequest.parameters()) {
+                    if (param.type() == HttpParameterType.URL) {
+                        queryParams.add(param.name());
+                    } else if (param.type() == HttpParameterType.COOKIE) {
+                        cookieParams.add(param.name());
+                    } else if (param.type() == HttpParameterType.BODY) {
+                        bodyParams.add(param.name());
+                    }
+                }
+
+                // Check if duplicate scan prevention is enabled
+                boolean shouldPreventDuplicates = core.uiManager.getConfig().isPreventDuplicates();
+                if (shouldPreventDuplicates) {
+                    // Check if the request has already been scanned
+                    if (dbHelper.isRequestScanned(method, endpoint, queryParams, cookieParams, bodyParams)) {
+                        core.logger.logToOutput("Skipping duplicate scan for " + method + " " + endpoint +
+                                                " with query: " + queryParams + ", cookies: " + cookieParams +
+                                                ", body: " + bodyParams);
+                        return ProxyRequestToBeSentAction.continueWith(interceptedRequest);
+                    }
+                } else {
+                    core.logger.logToOutput("Duplicate scan prevention is disabled, proceeding with scan for " +
+                                            method + " " + endpoint);
+                }
+
                 // Process SQL injection asynchronously
                 if (core.uiManager.getConfig().getCheckers().getOrDefault("SQLi", false)) {
                     executorService.submit(() -> sqliChecker.checkForSQLi(interceptedRequest));
@@ -123,12 +161,17 @@ public class WhoamiExtension implements BurpExtension {
                     executorService.submit(() -> noSQLIChecker.checkForNoSQLI(interceptedRequest));
                 }
 
+                // Store the scanned request in the database if duplicate prevention is enabled
+                if (shouldPreventDuplicates) {
+                    dbHelper.storeScannedRequest(method, endpoint, queryParams, cookieParams, bodyParams);
+                }
+
                 // Send original request immediately
                 return ProxyRequestToBeSentAction.continueWith(interceptedRequest);
             }
         });
 
-        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection, XSS, Command Injection, SSRF, SSTI, XXE, and NoSQLI testing, JSON handling, and context menu.");
+        core.logger.logToOutput("whoami extension loaded with method filtering, SQL injection, XSS, Command Injection, SSRF, SSTI, XXE, and NoSQLI testing, JSON handling, context menu, and duplicate scan prevention.");
     }
 
     private boolean hasExcludedExtension(String url, Set<String> excludedExtensions) {

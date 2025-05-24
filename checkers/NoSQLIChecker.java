@@ -72,10 +72,13 @@ public class NoSQLIChecker {
             String encodedEqPayload = core.getApi().utilities().urlUtils().encode(eqPayload);
             HttpParameter eqParam = HttpParameter.parameter(name, encodedEqPayload, type);
             HttpRequest eqReq = interceptedRequest.withUpdatedParameters(eqParam);
-            core.logger.log("NoSQLI", "Sending $eq payload for parameter: " + name + ", Payload: " + eqPayload + ", Encoded Payload: " + encodedEqPayload);
+            core.logger.log("NoSQLI", "Sending $eq payload for parameter: " + name + ", Payload: " + eqPayload + ", Encoded Payload: " + encodedEqPayload + ", Full URL: " + eqReq.url());
             HttpRequestResponse eqResp = core.requestSender.sendRequest(eqReq, "", false, bypassDelay);
             int eqStatus = eqResp.response() != null ? eqResp.response().statusCode() : 0;
             int eqLength = eqResp.response() != null ? eqResp.response().bodyToString().length() : 0;
+
+            // Log response details
+            core.logger.log("NoSQLI", "Response for $eq payload on " + name + ": Status=" + eqStatus + ", Length=" + eqLength);
 
             // Handle 400 Bad Request by retrying with stringified payload
             if (eqResp.response() != null && eqResp.response().statusCode() == 400) {
@@ -83,10 +86,11 @@ public class NoSQLIChecker {
                 String encodedStringifiedEqPayload = core.getApi().utilities().urlUtils().encode(stringifiedEqPayload);
                 eqParam = HttpParameter.parameter(name, encodedStringifiedEqPayload, type);
                 eqReq = interceptedRequest.withUpdatedParameters(eqParam);
-                core.logger.log("NoSQLI", "Received 400 Bad Request, retrying with stringified $eq payload: " + stringifiedEqPayload);
+                core.logger.log("NoSQLI", "Received 400 Bad Request, retrying with stringified $eq payload: " + stringifiedEqPayload + ", Full URL: " + eqReq.url());
                 eqResp = core.requestSender.sendRequest(eqReq, "", false, bypassDelay);
                 eqStatus = eqResp.response() != null ? eqResp.response().statusCode() : 0;
                 eqLength = eqResp.response() != null ? eqResp.response().bodyToString().length() : 0;
+                core.logger.log("NoSQLI", "Response after stringified $eq payload on " + name + ": Status=" + eqStatus + ", Length=" + eqLength);
             }
 
             // Check for 500 Internal Server Error on $eq request
@@ -107,10 +111,13 @@ public class NoSQLIChecker {
             String encodedNePayload = core.getApi().utilities().urlUtils().encode(nePayload);
             HttpParameter neParam = HttpParameter.parameter(name, encodedNePayload, type);
             HttpRequest neReq = interceptedRequest.withUpdatedParameters(neParam);
-            core.logger.log("NoSQLI", "Sending $ne payload for parameter: " + name + ", Payload: " + nePayload + ", Encoded Payload: " + encodedNePayload);
+            core.logger.log("NoSQLI", "Sending $ne payload for parameter: " + name + ", Payload: " + nePayload + ", Encoded Payload: " + encodedNePayload + ", Full URL: " + neReq.url());
             HttpRequestResponse neResp = core.requestSender.sendRequest(neReq, "", false, bypassDelay);
             int neStatus = neResp.response() != null ? neResp.response().statusCode() : 0;
             int neLength = neResp.response() != null ? neResp.response().bodyToString().length() : 0;
+
+            // Log response details
+            core.logger.log("NoSQLI", "Response for $ne payload on " + name + ": Status=" + neStatus + ", Length=" + neLength);
 
             // Handle 400 Bad Request by retrying with stringified payload
             if (neResp.response() != null && neResp.response().statusCode() == 400) {
@@ -118,10 +125,11 @@ public class NoSQLIChecker {
                 String encodedStringifiedNePayload = core.getApi().utilities().urlUtils().encode(stringifiedNePayload);
                 neParam = HttpParameter.parameter(name, encodedStringifiedNePayload, type);
                 neReq = interceptedRequest.withUpdatedParameters(neParam);
-                core.logger.log("NoSQLI", "Received 400 Bad Request, retrying with stringified $ne payload: " + stringifiedNePayload);
+                core.logger.log("NoSQLI", "Received 400 Bad Request, retrying with stringified $ne payload: " + stringifiedNePayload + ", Full URL: " + neReq.url());
                 neResp = core.requestSender.sendRequest(neReq, "", false, bypassDelay);
                 neStatus = neResp.response() != null ? neResp.response().statusCode() : 0;
                 neLength = neResp.response() != null ? neResp.response().bodyToString().length() : 0;
+                core.logger.log("NoSQLI", "Response after stringified $ne payload on " + name + ": Status=" + neStatus + ", Length=" + neLength);
             }
 
             // Check for 500 Internal Server Error on $ne request
@@ -174,12 +182,12 @@ public class NoSQLIChecker {
                 core.logger.log("NoSQLI", "No vulnerability detected for parameter: " + name);
             }
 
-            // Additional test for GET parameters: Inject [$eq] and [$ne] (e.g., orderid[$eq]=value)
+            // Additional test for GET parameters: Inject [$eq] and [$ne] (e.g., lng[$eq]=en)
             if (type == HttpParameterType.URL) {
                 // Remove the original parameter to avoid conflicts
                 HttpRequest baseWithoutParam = interceptedRequest.withRemovedParameters(parameter);
 
-                // Test param[$eq]=value (send raw value, e.g., orderid[$eq]=682457fb625038576f7fdf58)
+                // Test param[$eq]=value (send raw value, e.g., lng[$eq]=en)
                 String eqArrayParamName = name + "[$eq]";
                 String eqArrayValue = value; // Use the raw value, no JSON formatting
                 HttpParameter eqArrayParam = HttpParameter.urlParameter(eqArrayParamName, eqArrayValue);
@@ -188,6 +196,9 @@ public class NoSQLIChecker {
                 HttpRequestResponse eqArrayResp = core.requestSender.sendRequest(eqArrayReq, "", false, bypassDelay);
                 int eqArrayStatus = eqArrayResp.response() != null ? eqArrayResp.response().statusCode() : 0;
                 int eqArrayLength = eqArrayResp.response() != null ? eqArrayResp.response().bodyToString().length() : 0;
+
+                // Log response details
+                core.logger.log("NoSQLI", "Response for GET $eq payload on " + name + ": Status=" + eqArrayStatus + ", Length=" + eqArrayLength);
 
                 // Do not retry with stringified payload for raw GET parameters
                 if (eqArrayResp.response() != null && eqArrayResp.response().statusCode() == 500) {
@@ -201,7 +212,7 @@ public class NoSQLIChecker {
                     continue;
                 }
 
-                // Test param[$ne]=value (send raw value, e.g., orderid[$ne]=682457fb625038576f7fdf58)
+                // Test param[$ne]=value (send raw value, e.g., lng[$ne]=en)
                 String neArrayParamName = name + "[$ne]";
                 String neArrayValue = value; // Use the raw value, no JSON formatting
                 HttpParameter neArrayParam = HttpParameter.urlParameter(neArrayParamName, neArrayValue);
@@ -210,6 +221,9 @@ public class NoSQLIChecker {
                 HttpRequestResponse neArrayResp = core.requestSender.sendRequest(neArrayReq, "", false, bypassDelay);
                 int neArrayStatus = neArrayResp.response() != null ? neArrayResp.response().statusCode() : 0;
                 int neArrayLength = neArrayResp.response() != null ? neArrayResp.response().bodyToString().length() : 0;
+
+                // Log response details
+                core.logger.log("NoSQLI", "Response for GET $ne payload on " + name + ": Status=" + neArrayStatus + ", Length=" + neArrayLength);
 
                 // Do not retry with stringified payload for raw GET parameters
                 if (neArrayResp.response() != null && neArrayResp.response().statusCode() == 500) {
@@ -224,8 +238,9 @@ public class NoSQLIChecker {
                 }
 
                 // Step 4: Compare status codes for GET parameters
-                if (baseStatus != eqArrayStatus || eqArrayStatus != neArrayStatus || baseStatus == 0) {
-                    core.logger.log("NoSQLI", "Status codes differ or are zero for GET parameter: " + name + " (Base=" + baseStatus + ", $eq=" + eqArrayStatus + ", $ne=" + neArrayStatus + "). Skipping parameter.");
+                // Relaxed condition: Allow detection to proceed even if status codes differ slightly
+                if (baseStatus == 0) {
+                    core.logger.log("NoSQLI", "Base status code is zero for GET parameter: " + name + ". Skipping parameter.");
                     continue;
                 }
 
@@ -335,10 +350,13 @@ public class NoSQLIChecker {
             String encodedEqPayload = core.getApi().utilities().urlUtils().encode(eqPayload);
             HttpParameter eqParam = HttpParameter.parameter(name, encodedEqPayload, type);
             HttpRequest eqReq = request.withUpdatedParameters(eqParam);
-            core.logger.log("NoSQLI", "Sending $eq payload for parameter: " + name + ", Payload: " + eqPayload + ", Encoded Payload: " + encodedEqPayload);
+            core.logger.log("NoSQLI", "Sending $eq payload for parameter: " + name + ", Payload: " + eqPayload + ", Encoded Payload: " + encodedEqPayload + ", Full URL: " + eqReq.url());
             HttpRequestResponse eqResp = core.requestSender.sendRequest(eqReq, "", false, bypassDelay);
             int eqStatus = eqResp.response() != null ? eqResp.response().statusCode() : 0;
             int eqLength = eqResp.response() != null ? eqResp.response().bodyToString().length() : 0;
+
+            // Log response details
+            core.logger.log("NoSQLI", "Response for $eq payload on " + name + ": Status=" + eqStatus + ", Length=" + eqLength);
 
             // Handle 400 Bad Request by retrying with stringified payload
             if (eqResp.response() != null && eqResp.response().statusCode() == 400) {
@@ -346,10 +364,11 @@ public class NoSQLIChecker {
                 String encodedStringifiedEqPayload = core.getApi().utilities().urlUtils().encode(stringifiedEqPayload);
                 eqParam = HttpParameter.parameter(name, encodedStringifiedEqPayload, type);
                 eqReq = request.withUpdatedParameters(eqParam);
-                core.logger.log("NoSQLI", "Received 400 Bad Request, retrying with stringified $eq payload: " + stringifiedEqPayload);
+                core.logger.log("NoSQLI", "Received 400 Bad Request, retrying with stringified $eq payload: " + stringifiedEqPayload + ", Full URL: " + eqReq.url());
                 eqResp = core.requestSender.sendRequest(eqReq, "", false, bypassDelay);
                 eqStatus = eqResp.response() != null ? eqResp.response().statusCode() : 0;
                 eqLength = eqResp.response() != null ? eqResp.response().bodyToString().length() : 0;
+                core.logger.log("NoSQLI", "Response after stringified $eq payload on " + name + ": Status=" + eqStatus + ", Length=" + eqLength);
             }
 
             // Check for 500 Internal Server Error on $eq request
@@ -370,10 +389,13 @@ public class NoSQLIChecker {
             String encodedNePayload = core.getApi().utilities().urlUtils().encode(nePayload);
             HttpParameter neParam = HttpParameter.parameter(name, encodedNePayload, type);
             HttpRequest neReq = request.withUpdatedParameters(neParam);
-            core.logger.log("NoSQLI", "Sending $ne payload for parameter: " + name + ", Payload: " + nePayload + ", Encoded Payload: " + encodedNePayload);
+            core.logger.log("NoSQLI", "Sending $ne payload for parameter: " + name + ", Payload: " + nePayload + ", Encoded Payload: " + encodedNePayload + ", Full URL: " + neReq.url());
             HttpRequestResponse neResp = core.requestSender.sendRequest(neReq, "", false, bypassDelay);
             int neStatus = neResp.response() != null ? neResp.response().statusCode() : 0;
             int neLength = neResp.response() != null ? neResp.response().bodyToString().length() : 0;
+
+            // Log response details
+            core.logger.log("NoSQLI", "Response for $ne payload on " + name + ": Status=" + neStatus + ", Length=" + neLength);
 
             // Handle 400 Bad Request by retrying with stringified payload
             if (neResp.response() != null && neResp.response().statusCode() == 400) {
@@ -381,10 +403,11 @@ public class NoSQLIChecker {
                 String encodedStringifiedNePayload = core.getApi().utilities().urlUtils().encode(stringifiedNePayload);
                 neParam = HttpParameter.parameter(name, encodedStringifiedNePayload, type);
                 neReq = request.withUpdatedParameters(neParam);
-                core.logger.log("NoSQLI", "Received 400 Bad Request, retrying with stringified $ne payload: " + stringifiedNePayload);
+                core.logger.log("NoSQLI", "Received 400 Bad Request, retrying with stringified $ne payload: " + stringifiedNePayload + ", Full URL: " + neReq.url());
                 neResp = core.requestSender.sendRequest(neReq, "", false, bypassDelay);
                 neStatus = neResp.response() != null ? neResp.response().statusCode() : 0;
                 neLength = neResp.response() != null ? neResp.response().bodyToString().length() : 0;
+                core.logger.log("NoSQLI", "Response after stringified $ne payload on " + name + ": Status=" + neStatus + ", Length=" + neLength);
             }
 
             // Check for 500 Internal Server Error on $ne request
@@ -437,12 +460,12 @@ public class NoSQLIChecker {
                 core.logger.log("NoSQLI", "No vulnerability detected for parameter: " + name);
             }
 
-            // Additional test for GET parameters: Inject [$eq] and [$ne] (e.g., orderid[$eq]=value)
+            // Additional test for GET parameters: Inject [$eq] and [$ne] (e.g., lng[$eq]=en)
             if (type == HttpParameterType.URL) {
                 // Remove the original parameter to avoid conflicts
                 HttpRequest baseWithoutParam = request.withRemovedParameters(parameter);
 
-                // Test param[$eq]=value (send raw value, e.g., orderid[$eq]=682457fb625038576f7fdf58)
+                // Test param[$eq]=value (send raw value, e.g., lng[$eq]=en)
                 String eqArrayParamName = name + "[$eq]";
                 String eqArrayValue = value; // Use the raw value, no JSON formatting
                 HttpParameter eqArrayParam = HttpParameter.urlParameter(eqArrayParamName, eqArrayValue);
@@ -451,6 +474,9 @@ public class NoSQLIChecker {
                 HttpRequestResponse eqArrayResp = core.requestSender.sendRequest(eqArrayReq, "", false, bypassDelay);
                 int eqArrayStatus = eqArrayResp.response() != null ? eqArrayResp.response().statusCode() : 0;
                 int eqArrayLength = eqArrayResp.response() != null ? eqArrayResp.response().bodyToString().length() : 0;
+
+                // Log response details
+                core.logger.log("NoSQLI", "Response for GET $eq payload on " + name + ": Status=" + eqArrayStatus + ", Length=" + eqArrayLength);
 
                 // Do not retry with stringified payload for raw GET parameters
                 if (eqArrayResp.response() != null && eqArrayResp.response().statusCode() == 500) {
@@ -464,7 +490,7 @@ public class NoSQLIChecker {
                     continue;
                 }
 
-                // Test param[$ne]=value (send raw value, e.g., orderid[$ne]=682457fb625038576f7fdf58)
+                // Test param[$ne]=value (send raw value, e.g., lng[$ne]=en)
                 String neArrayParamName = name + "[$ne]";
                 String neArrayValue = value; // Use the raw value, no JSON formatting
                 HttpParameter neArrayParam = HttpParameter.urlParameter(neArrayParamName, neArrayValue);
@@ -473,6 +499,9 @@ public class NoSQLIChecker {
                 HttpRequestResponse neArrayResp = core.requestSender.sendRequest(neArrayReq, "", false, bypassDelay);
                 int neArrayStatus = neArrayResp.response() != null ? neArrayResp.response().statusCode() : 0;
                 int neArrayLength = neArrayResp.response() != null ? neArrayResp.response().bodyToString().length() : 0;
+
+                // Log response details
+                core.logger.log("NoSQLI", "Response for GET $ne payload on " + name + ": Status=" + neArrayStatus + ", Length=" + neArrayLength);
 
                 // Do not retry with stringified payload for raw GET parameters
                 if (neArrayResp.response() != null && neArrayResp.response().statusCode() == 500) {
@@ -487,8 +516,9 @@ public class NoSQLIChecker {
                 }
 
                 // Step 4: Compare status codes for GET parameters
-                if (baseStatus != eqArrayStatus || eqArrayStatus != neArrayStatus || baseStatus == 0) {
-                    core.logger.log("NoSQLI", "Status codes differ or are zero for GET parameter: " + name + " (Base=" + baseStatus + ", $eq=" + eqArrayStatus + ", $ne=" + neArrayStatus + "). Skipping parameter.");
+                // Relaxed condition: Allow detection to proceed even if status codes differ slightly
+                if (baseStatus == 0) {
+                    core.logger.log("NoSQLI", "Base status code is zero for GET parameter: " + name + ". Skipping parameter.");
                     continue;
                 }
 

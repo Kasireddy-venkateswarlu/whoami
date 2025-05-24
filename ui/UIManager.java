@@ -2,6 +2,7 @@ package whoami.ui;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.ui.swing.SwingUtils;
+import whoami.core.ScanDatabaseHelper;
 
 import javax.swing.*;
 import java.awt.*;
@@ -13,6 +14,7 @@ import java.util.Set;
 public class UIManager {
     private final MontoyaApi api;
     private final Config config;
+    private ScanDatabaseHelper dbHelper;
 
     public UIManager(MontoyaApi api) {
         this.api = api;
@@ -34,8 +36,8 @@ public class UIManager {
         bannerLabel.setFont(new Font("Arial", Font.BOLD, 18));
         bannerLabel.setForeground(Color.BLACK);
         bannerLabel.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(Color.ORANGE, 3), // Thick orange border
-            BorderFactory.createEmptyBorder(5, 10, 5, 10)    // Inner padding
+            BorderFactory.createLineBorder(Color.ORANGE, 3),
+            BorderFactory.createEmptyBorder(5, 10, 5, 10)
         ));
         bannerLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         mainPanel.add(bannerLabel);
@@ -44,7 +46,7 @@ public class UIManager {
         // Top Panel: Toggle and Delay
         JPanel topPanel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(3, 5, 3, 5); // Reduced vertical insets for tighter spacing
+        gbc.insets = new Insets(3, 5, 3, 5);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
         JLabel statusLabel = new JLabel("Extension is OFF");
@@ -55,7 +57,7 @@ public class UIManager {
             statusLabel.setText(config.isEnabled() ? "Extension is ON" : "Extension is OFF");
         });
 
-        JTextField delayField = new JTextField("0", 3); // Reduced column size for compact input
+        JTextField delayField = new JTextField("0", 3);
         delayField.getDocument().addDocumentListener((SimpleDocumentListener) e -> {
             try {
                 config.setDelayMillis(Integer.parseInt(delayField.getText()) * 1000);
@@ -97,7 +99,7 @@ public class UIManager {
         JPanel testPanel = new JPanel(new GridBagLayout());
         testPanel.setBorder(BorderFactory.createTitledBorder("Testing Options"));
         GridBagConstraints testGbc = new GridBagConstraints();
-        testGbc.insets = new Insets(2, 5, 2, 5); // Reduced vertical insets for tighter spacing
+        testGbc.insets = new Insets(2, 5, 2, 5);
         testGbc.fill = GridBagConstraints.HORIZONTAL;
         testGbc.anchor = GridBagConstraints.WEST;
 
@@ -125,7 +127,10 @@ public class UIManager {
         JCheckBox testCookiesCheckbox = new JCheckBox("Test Cookie Parameters");
         testCookiesCheckbox.addActionListener(e -> config.setTestCookies(testCookiesCheckbox.isSelected()));
 
-        JTextArea excludedExtensionsArea = new JTextArea(2, 15); // Reduced to 2 rows, 15 columns
+        JCheckBox preventDuplicatesCheckbox = new JCheckBox("Prevent Duplicate Scans", true);
+        preventDuplicatesCheckbox.addActionListener(e -> config.setPreventDuplicates(preventDuplicatesCheckbox.isSelected()));
+
+        JTextArea excludedExtensionsArea = new JTextArea(2, 15);
         excludedExtensionsArea.setText(".css,.js,.png,.jpg,.jpeg,.gif,.svg,.ico,.woff,.woff2,.ttf,.eot");
         excludedExtensionsArea.getDocument().addDocumentListener((SimpleDocumentListener) e -> {
             String[] extensions = excludedExtensionsArea.getText().split(",");
@@ -161,13 +166,43 @@ public class UIManager {
         testGbc.gridy = row++;
         testPanel.add(testCookiesCheckbox, testGbc);
         testGbc.gridy = row++;
+        testPanel.add(preventDuplicatesCheckbox, testGbc);
+        testGbc.gridy = row++;
         testPanel.add(new JLabel("Excluded File Extensions (comma-separated):"), testGbc);
         testGbc.gridy = row++;
         testPanel.add(new JScrollPane(excludedExtensionsArea), testGbc);
 
         mainPanel.add(testPanel);
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
-        api.userInterface().registerSuiteTab("whoami", mainPanel);
+        // Add Clear DB Button at the bottom with logging
+        api.logging().logToOutput("Adding Clear DB button to UI");
+        JButton clearDbButton = new JButton("Clear DB");
+        clearDbButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        clearDbButton.addActionListener(e -> {
+            api.logging().logToOutput("Clear DB button clicked");
+            if (dbHelper != null) {
+                dbHelper.clearDatabase();
+                JOptionPane.showMessageDialog(mainPanel, "Scan database cleared successfully.", "Success", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(mainPanel, "Database helper not initialized.", "Error", JOptionPane.ERROR_MESSAGE);
+                api.logging().logToError("Clear DB button error: Database helper not initialized");
+            }
+        });
+        mainPanel.add(clearDbButton);
+        api.logging().logToOutput("Clear DB button added to UI");
+
+        // Wrap mainPanel in a JScrollPane to handle overflow
+        JScrollPane scrollPane = new JScrollPane(mainPanel);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+
+        api.userInterface().registerSuiteTab("whoami", scrollPane);
+    }
+
+    public void setDbHelper(ScanDatabaseHelper dbHelper) {
+        this.dbHelper = dbHelper;
+        api.logging().logToOutput("Database helper set in UIManager");
     }
 
     public static class Config {
@@ -177,6 +212,7 @@ public class UIManager {
         private boolean testCookies = false;
         private Set<String> excludedExtensions = new HashSet<>();
         private long delayMillis = 0;
+        private boolean preventDuplicates = true;
 
         public boolean isEnabled() {
             return isEnabled;
@@ -220,6 +256,14 @@ public class UIManager {
 
         public void setDelayMillis(long delayMillis) {
             this.delayMillis = delayMillis;
+        }
+
+        public boolean isPreventDuplicates() {
+            return preventDuplicates;
+        }
+
+        public void setPreventDuplicates(boolean preventDuplicates) {
+            this.preventDuplicates = preventDuplicates;
         }
     }
 
