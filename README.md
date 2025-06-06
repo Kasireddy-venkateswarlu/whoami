@@ -113,7 +113,7 @@ The WhoAmI extension automatically injects basic test payloads for common vulner
 - Tracks scanned requests with a SQLite database to avoid redundant testing.
 
 ### 8. Cookie Parameter Testing
-- Injects payloads into cookies to find server-side logic vulnerabilities.
+- Injects payloads into cookies to find vulnerabilities.
 
 ### 9. Excluded File Extensions
 - Skips static files like .css, .js, images to focus on dynamic content.
