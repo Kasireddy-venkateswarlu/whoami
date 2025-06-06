@@ -28,7 +28,7 @@ This slows down testing and reduces the efficiency of the pentesting.
 
 ---
 
-### ✅ **Solution Provided by WhoAmI Extension**
+###  **Solution Provided by WhoAmI Extension**
 
 The WhoAmI extension automatically injects basic test payloads for common vulnerabilities into every parameter of each proxied request during crawling or testing within your scope.
 
@@ -103,8 +103,9 @@ The WhoAmI extension automatically injects basic test payloads for common vulner
 
 ### 6. Context Menu Integration
 - Right-click menu to manually trigger scans.
--
--
+
+
+
 - ![11](https://github.com/user-attachments/assets/514466da-5aea-42fe-acb1-b0454c86f7a3)
 
 
