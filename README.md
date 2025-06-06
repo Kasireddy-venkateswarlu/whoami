@@ -4,25 +4,45 @@
 
 ---
 
-## Problem Statement
+###  **Problem Statement**
 
-During manual penetration testing, applications often have many API endpoints with numerous parameters (JSON, query, form data, cookies). Manually injecting basic test payloads for vulnerabilities like SQLi, XSS, SSRF, Command Injection, etc., into each parameter is very time-consuming and error-prone.
+During manual penetration testing of modern web applications, we often deal with a **large number of API endpoints**. Each endpoint may contain **many parameters**, sometimes **20 to 30 or more** — in **query strings**, **JSON bodies**, or even nested objects.
+
+Manually testing each parameter across all these APIs is:
+
+* **Time-consuming**
+* **Repetitive**
+* And often leads to **human error or missed vulnerabilities**
+
+With this challenge, testers waste time repeating the same steps like:
+
+* Inserting basic payloads for **SQL Injection**, **XSS**, **NoSQL Injection**, **Command Injection**, etc.
+* Analyzing responses for each change manually
+* Repeating the process across hundreds of API endpoints
+
+This slows down testing and reduces the efficiency of the overall penetration test.
 
 ---
 
-## Solution
+### ✅ **Solution Provided by WhoAmI Extension**
 
-The WhoAmI extension automates the injection of basic test payloads for common vulnerabilities into every parameter of each proxied request within your testing scope. While crawling or testing the application, it performs simple but effective vulnerability checks automatically, including:
+The **WhoAmI Extension** for Burp Suite solves this problem by automating the process. It:
 
-- SQL Injection payloads
-- Cross-site Scripting (XSS) payloads
-- Server-Side Request Forgery (SSRF) payloads
-- Command Injection payloads
-- NoSQL Injection payloads
-- And more
+* Automatically identifies all **parameters across all API requests**
+* Injects basic payloads for **SQLi**, **XSS**, **NoSQLi**, **CMDi**, and other common vulnerabilities into **every parameter**
+* Works across different content types like **query parameters**, **JSON**, and **nested structures**
+* Flags **successful injections** by detecting changes in response or behavior
+* Also detects **HTTP 500 errors** that may indicate unhandled exceptions or crash points
+* Gives a quick view of potentially vulnerable parameters for further manual testing
 
-It also notifies the tester instantly if a vulnerability is detected or if the server returns an HTTP 500 Internal Server Error (which is important for further manual analysis).
+---
 
+### Benefits
+
+* Saves **significant time** in large-scope applications with **many APIs and parameters**
+* Increases **testing coverage**
+* Helps **quickly spot** parameters that may be vulnerable
+* Improves overall **productivity and accuracy** in manual penetration testing
 ---
 
 ## Features
@@ -32,7 +52,7 @@ It also notifies the tester instantly if a vulnerability is detected or if the s
 - Injects example payloads for common vulnerabilities and analyzes responses to notify on positive findings:
 
   - **SQL Injection (SQLi):**  
-    Payload example: `'`  
+    Payload: `'`  
     If the server returns a **500 Internal Server Error**, the extension retries with `''` (two single quotes).  
     If the response is **200 OK** it notifies as SQL Injection.
 
@@ -74,7 +94,7 @@ It also notifies the tester instantly if a vulnerability is detected or if the s
 - Easily enable or disable extension functionality during testing.
 
 ### 6. Context Menu Integration
-- Right-click menu to manually trigger scans or add requests to scope.
+- Right-click menu to manually trigger scans.
 
 ### 7. Duplication Prevention
 - Tracks scanned requests with a SQLite database to avoid redundant testing.
@@ -84,19 +104,6 @@ It also notifies the tester instantly if a vulnerability is detected or if the s
 
 ### 9. Excluded File Extensions
 - Skips static files like .css, .js, images to focus on dynamic content.
-
----
-
-## Benefits
-
-- **Time Savings:** Automates repetitive manual payload injections.
-- **Comprehensive Coverage:** Tests all parameters including complex and nested ones.
-- **Early Vulnerability Detection:** Immediate alerts help prioritize deeper testing.
-- **Error Flagging:** Highlights HTTP 500 errors that could expose hidden issues.
-- **Optimized Performance:** Filtering and duplication checks reduce unnecessary scans.
-- **Easy to Use:** UI toggle and context menu integrate smoothly with Burp Suite workflows.
-
----
 
 ## Technical Details
 
