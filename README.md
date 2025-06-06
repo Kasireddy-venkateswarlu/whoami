@@ -56,7 +56,7 @@ The WhoAmI extension automatically injects basic test payloads for common vulner
 ## Features
 
 ### 1. Injecting Basic Payloads into Every Parameter
-- Supports Query Parameters, Form Data, JSON bodies, Cookies, and Headers.
+- Supports Query Parameters,JSON bodies, Cookies parameters.
 - Injects example payloads for common vulnerabilities and analyzes responses to notify on positive findings:
 
   - **SQL Injection (SQLi):**  
