@@ -20,7 +20,7 @@ With this challenge, testers waste time repeating the same steps like:
 * Analyzing responses for each change manually
 * Repeating the process across hundreds of API endpoints
 
-This slows down testing and reduces the efficiency of the overall penetration test.
+This slows down testing and reduces the efficiency of the pentesting.
 
 ---
 
