@@ -28,7 +28,7 @@ This slows down testing and reduces the efficiency of the overall penetration te
 
 The **WhoAmI Extension** for Burp Suite solves this problem by automating the process. It:
 
-* Automatically identifies all **parameters across all API requests**
+* Automatically identifies all **parameters across all requests**
 * Injects basic payloads for **SQLi**, **XSS**, **NoSQLi**, **CMDi**, and other common vulnerabilities into **every parameter**
 * Works across different content types like **query parameters**, **JSON**, and **nested structures**
 * Flags **successful injections** by detecting changes in response or behavior
