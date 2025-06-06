@@ -1,12 +1,12 @@
 # WhoAmI Burp Extension
 
-**WhoAmI** is a Burp Suite extension designed to automate basic manual penetration testing checks by injecting common vulnerability payloads into every parameter of proxied requests. It helps testers save time, increase parameter coverage, and get real-time notifications about vulnerabilities and server errors during manual testing.
+**WhoAmI** is a Burp Suite extension designed to automate basic manual penetration testing checks by injecting common vulnerability payloads into every parameter of proxied requests. It helps testers save time, increase parameter coverage, and get real-time notifications about vulnerabilities and server errors(500) during manual testing.
 
 ---
 
 ## Problem Statement
 
-During manual penetration testing, applications often have many API endpoints with numerous parameters (JSON, query, form data, cookies, headers). Manually injecting basic test payloads for vulnerabilities like SQLi, XSS, SSRF, Command Injection, etc., into each parameter is very time-consuming and error-prone.
+During manual penetration testing, applications often have many API endpoints with numerous parameters (JSON, query, form data, cookies). Manually injecting basic test payloads for vulnerabilities like SQLi, XSS, SSRF, Command Injection, etc., into each parameter is very time-consuming and error-prone.
 
 ---
 
@@ -28,9 +28,37 @@ It also notifies the tester instantly if a vulnerability is detected or if the s
 ## Features
 
 ### 1. Injecting Basic Payloads into Every Parameter
-- Supports Query Parameters, Form Data, JSON bodies (including nested), Cookies, and Headers.
-- Example payloads for SQLi, XSS, SSRF, Command Injection, SSTI, XXE, NoSQL Injection.
-- Uses Burp Suite API for seamless parameter detection and request modification.
+- Supports Query Parameters, Form Data, JSON bodies, Cookies, and Headers.
+- Injects example payloads for common vulnerabilities and analyzes responses to notify on positive findings:
+
+  - **SQL Injection (SQLi):**  
+    Payload example: `'`  
+    If the server returns a **500 Internal Server Error**, the extension retries with `''` (double single quotes).  
+    If the response is **200 OK** with SQL error patterns or unexpected behavior, it notifies as SQL Injection.
+
+  - **Cross-Site Scripting (XSS):**  
+    Payload examples: `<h1>hai</h1>`, `'-prompt(1)-'`, `" onmouseover="alert(1)`  
+    If these payloads are reflected in the response **without encoding or sanitization**, the extension notifies as XSS.
+
+  - **Command Injection:**  
+    Uses different command combinations (e.g., `nslookup` pointing to a Burp Collaborator URL).  
+    If the Collaborator receives DNS or HTTP interactions from the target, the extension notifies as Command Injection.
+
+  - **Server-Side Request Forgery (SSRF):**  
+    Injects URLs using protocols like `http`, `https`, `file` with Burp Collaborator payloads.  
+    If any out-of-band interaction is received, the extension notifies as SSRF.
+
+  - **Server-Side Template Injection (SSTI):**  
+    Payloads like `{{7*7}}` are injected.  
+    If the response contains the evaluated result (e.g., `49`), the extension notifies as SSTI.
+
+  - **XML External Entity (XXE):**  
+    Injects external entity payloads with out-of-band Burp Collaborator URLs.  
+    If any collaborator interaction occurs, it notifies as XXE.
+
+  - **NoSQL Injection:**  
+    Injects operators like `$eq` and `$ne` into JSON parameters.  
+    Based on response behavior differences (e.g., data returned or errors), it notifies as NoSQL Injection.
 
 ### 2. Real-Time Response Monitoring and Notifications
 - Detects reflected payloads, error messages, and HTTP 500 errors.
@@ -100,22 +128,4 @@ It also notifies the tester instantly if a vulnerability is detected or if the s
 
 ---
 
-## Contributing
 
-Contributions, issues, and feature requests are welcome! Feel free to open a pull request or issue.
-
----
-
-## License
-
-[MIT License](LICENSE)
-
----
-
-## Contact
-
-For questions or support, please open an issue or contact me directly.
-
----
-
-*WhoAmI helps manual penetration testers automate basic vulnerability checks with high coverage and efficiency, making your testing faster and more thorough.*
