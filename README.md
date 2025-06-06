@@ -33,8 +33,8 @@ It also notifies the tester instantly if a vulnerability is detected or if the s
 
   - **SQL Injection (SQLi):**  
     Payload example: `'`  
-    If the server returns a **500 Internal Server Error**, the extension retries with `''` (double single quotes).  
-    If the response is **200 OK** with SQL error patterns or unexpected behavior, it notifies as SQL Injection.
+    If the server returns a **500 Internal Server Error**, the extension retries with `''` (two single quotes).  
+    If the response is **200 OK** it notifies as SQL Injection.
 
   - **Cross-Site Scripting (XSS):**  
     Payload examples: `<h1>hai</h1>`, `'-prompt(1)-'`, `" onmouseover="alert(1)`  
@@ -58,17 +58,16 @@ It also notifies the tester instantly if a vulnerability is detected or if the s
 
   - **NoSQL Injection:**  
     Injects operators like `$eq` and `$ne` into JSON parameters.  
-    Based on response behavior differences (e.g., data returned or errors), it notifies as NoSQL Injection.
+    Based on response behavior differences. it notifies as NoSQL Injection.
 
-### 2. Real-Time Response Monitoring and Notifications
-- Detects reflected payloads, error messages, and HTTP 500 errors.
-- Alerts via Burp Suite UI and logs for immediate attention.
+### 2. 500 Error Notification
+- Flags HTTP 500 Internal Server Errors returned by the application during payload injection.  
+- Such errors often indicate server crashes, misconfigurations, or underlying vulnerabilities.  
+- When the extension injects a payload that triggers a 500 error, it immediately notifies the tester.  
+- The extension stores the full request-response pair for easy manual follow-up and deeper analysis.  
+- This feature helps testers identify unstable or poorly handled inputs that require further investigation.
 
-### 3. 500 Error Notification
-- Flags server errors indicating crashes, misconfigurations, or vulnerabilities.
-- Stores request-response pairs for manual follow-up.
-
-### 4. HTTP Method Filtering
+### 3. HTTP Method Filtering
 - Allows testers to limit scans to specific HTTP methods (GET, POST, etc.).
 
 ### 5. Extension On/Off Toggle
@@ -102,29 +101,30 @@ It also notifies the tester instantly if a vulnerability is detected or if the s
 ## Technical Details
 
 - Developed in Java using Burp Suite Extender API.
-- Utilizes asynchronous processing to maintain UI responsiveness.
 - Uses SQLite for scan history and duplication prevention.
 - Detailed logging for debugging and audit.
-- Robust error handling for malformed requests and network issues.
 
 ---
 
 ## Installation
 
-1. Download the latest `.jar` file from the [Releases](#) section.
-2. Open Burp Suite and go to the Extender tab.
-3. Click `Add` and select the downloaded `.jar` file.
-4. Configure extension settings as needed.
+1. Download the entire zip file of the extension.  
+2. Unzip the downloaded file to a desired location.  
+3. Locate the `WhoAmIExtension.jar` file inside the `out` directory.  
+4. Load the `WhoAmIExtension.jar` file in Burp Suite via **Extenaions > Extensions > Add**.  
+5. Add the `libs` directory path to the Java environment settings in Burp Suite.  
+
 
 ---
 
 ## Usage
 
-- Enable the extension using the toggle button.
-- Set the HTTP methods and excluded extensions.
-- Browse or crawl your target application.
-- Watch for alerts and 500 error notifications.
-- Use the context menu to manually trigger scans or add to scope.
+- Enable the extension using the toggle button in the extension's UI.  
+- Set the HTTP methods you want the extension to process (e.g., GET, POST).  
+- Select the vulnerabilities you want to check (e.g., SQLi, XSS, SSRF).  
+- Browse or crawl your target application as usual.  
+- Watch for vulnerability alerts and 500 error notifications in real time.  
+- Use the context menu (right-click) to manually trigger scans on specific requests when needed.
 
 ---
 
