@@ -26,7 +26,7 @@ This slows down testing and reduces the efficiency of the overall penetration te
 
 ### ✅ **Solution Provided by WhoAmI Extension**
 
-The **WhoAmI Extension** for Burp Suite solves this problem by automating the process. It:
+The WhoAmI extension automates the injection of basic test payloads for common vulnerabilities into every parameter of each proxied request within your testing scope. While crawling or testing the application.
 
 * Automatically identifies all **parameters across all requests**
 * Injects basic payloads for **SQLi**, **XSS**, **NoSQLi**, **CMDi**, and other common vulnerabilities into **every parameter**
