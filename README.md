@@ -1,4 +1,4 @@
-# WhoAmI Burp Extension
+# WhoAmI Burp Extension - Automating Repetitive Manual Testing Checks
 
 **WhoAmI** is a Burp Suite extension designed to automate basic manual penetration testing checks by injecting common vulnerability payloads into every parameter of proxied requests. It helps testers save time, increase parameter coverage, and get real-time notifications about vulnerabilities and server errors(500) during manual testing.
 
