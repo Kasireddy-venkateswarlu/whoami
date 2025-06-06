@@ -129,10 +129,11 @@ The WhoAmI extension automatically injects basic test payloads for common vulner
 ## Installation
 
 1. Download the entire zip file of the extension.  
-2. Unzip the downloaded file to a desired location.  
-3. Locate the `WhoAmIExtension.jar` file inside the `out` directory.  
-4. Load the `WhoAmIExtension.jar` file in Burp Suite via **Extenaions > Extensions > Add**.  
-5. Add the `libs` directory path to the Java environment settings in Burp Suite.  
+2. Unzip the downloaded file to a desired location.
+3. Add the `libs` directory path to the Java environment settings in Burp Suite.  
+4. Locate the `WhoAmIExtension.jar` file inside the `out` directory.
+5. Load the `WhoAmIExtension.jar` file in Burp Suite via **Extenaions > Extensions > Add**.  
+
 
 
 ---
