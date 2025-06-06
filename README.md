@@ -26,7 +26,7 @@ This slows down testing and reduces the efficiency of the pentesting.
 
 ### ✅ **Solution Provided by WhoAmI Extension**
 
-The WhoAmI extension automates the injection of basic test payloads for common vulnerabilities into every parameter of each proxied request within your testing scope. While crawling or testing the application.
+The WhoAmI extension automatically injects basic test payloads for common vulnerabilities into every parameter of each proxied request during crawling or testing within your scope.
 
 * Automatically identifies all **parameters across all requests**
 * Injects basic payloads for **SQLi**, **XSS**, **NoSQLi**, **CMDi**, and other common vulnerabilities into **every parameter**
