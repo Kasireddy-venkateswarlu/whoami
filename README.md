@@ -1,4 +1,4 @@
-Sure! Here’s the updated version replacing **WhoAmI** with **Manual Testing Helper**:
+
 
 ---
 
